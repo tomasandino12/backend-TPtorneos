@@ -1,0 +1,1 @@
+Hasta ahora estoy haciendo todo el contenido de los videos del profe Meca y cuando termine el 12 y entienda bien que estoy haciendo y como hacer cada cosa intentare pasar todo lo que estoy viendo al ambito de nuestro proyecto
