@@ -1,5 +1,6 @@
 import express, { NextFunction, Request, Response } from 'express'
-import { Character } from './character.js'
+import { Character } from './character/character.entity.js'
+import { CharacterRepository } from './character/character.repository.js'
 const app = express()
 app.use(express.json())  //middleware de express para usar (solo parchea json)
 
@@ -11,6 +12,8 @@ app.use(express.json())  //middleware de express para usar (solo parchea json)
 // put & patch (modificar recursos) debo indicar cual modificar
 
 // accedo a recursos mediante url /api/version(puede no estar)/recursos/
+
+const repository = new CharacterRepository()
 
 const characters= [
     new Character(
@@ -39,13 +42,14 @@ function sanitizeCharacterInput(req: Request, res: Response, next: NextFunction)
 }
 
 app.get('/api/characters', (req, res) =>{
-    res.json({data : characters})   //me sirve saber que todos devuelven lo mismo asi se q tengo q buscar en propiedad data  (más consistente)
+    res.json({data : repository.findAll()})   //me sirve saber que todos devuelven lo mismo asi se q tengo q buscar en propiedad data  (más consistente)
 })
 
-app.get('/api/characters/:id', (req, res) =>{
-    const character = characters.find((character)=> character.id === req.params.id)
-    if(!character){
+app.get('/api/characters/:id', (req,res) =>{
+    const character = repository.findOne({id : req.params.id})
+    if(!character) {
         res.status(404).send({message: 'Character not found'})
+        return
     }
     res.json({data : character})   //en caso de encontrarlo (el de arriba es si no encuentra)
 })
@@ -53,38 +57,52 @@ app.get('/api/characters/:id', (req, res) =>{
 app.post('/api/characters',sanitizeCharacterInput, (req, res) => {                                         // no necesito middleware en la ruta pq esta global
     const input = req.body.sanitizedInput                                    //obtengo la data basado ne los elementos
     
-    const character = new Character( input.name, input.level, input.attack, input.items )
+    const characterInput = new Character( input.name, input.level, input.attack, input.items )
 
-    characters.push(character)
+    const character = repository.add(characterInput)
     res.status(201).send({message: 'Character created', data: character})
 })
 
 app.put('/api/characters/:id',sanitizeCharacterInput, (req, res)=> {
-    const characterIdx = characters.findIndex((character) => character.id === req.params.id)   //findIndex devuelve indice del arreglo donde esta ese character, si lo hiciera sin index crearía otro character en memoria 
-
-    if(characterIdx === -1){
+    req.body.sanitizedInput.id = req.params.id
+    const character = repository.update(req.body.sanitizedInput)
+    
+    if(!character){
         res.status(404).send({message: 'Character not found' })
+        return
     }
 
-    characters[characterIdx] = {...characters[characterIdx], ...req.body.sanitizedInput }         //que verga es spread operator y que hizo dios
-
-    res.status(200).send({message: 'Character updated successfully', data: characters[characterIdx]})
+    res.status(200).send({message: 'Character updated successfully', data: character})
 })
 
 
 app.patch('/api/characters/:id',sanitizeCharacterInput, (req, res)=> {
-    const characterIdx = characters.findIndex((character) => character.id === req.params.id)  
-
-    if(characterIdx === -1){
+    req.body.sanitizedInput.id = req.params.id
+    const character = repository.update(req.body.sanitizedInput)
+    
+    if(!character){
         res.status(404).send({message: 'Character not found' })
+        return
     }
 
-    characters[characterIdx] = {...characters[characterIdx], ...req.body.sanitizedInput }    
-
-    res.status(200).send({message: 'Character updated successfully', data: characters[characterIdx]})
+    res.status(200).send({message: 'Character updated successfully', data: character})
 })
 
+app.delete('/api/characters/:id', (req, res)=>{
+    const id = req.params.id
+    const character = repository.delete({id})
 
+
+    if(!character){
+        res.status(404).send({message: 'Character not found'})
+    }else{
+        res.status(200).send({message:'Character deleted successfully'})
+    }
+})
+
+app.use((_,res)=>{
+    res.status(404).send({message: 'Resource not found'})
+})
 
 app.listen(3000, ()=>{
     console.log("Server running on http://localhost:3000/")

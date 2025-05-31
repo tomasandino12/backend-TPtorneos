@@ -27,7 +27,7 @@ Content-Type: application/json
 }
 
 
-### modificar parcialmente un character
+### modificar parcialmente un character  (sirve para modificaciones incrementales tambien, como subir un nivel o agregar un item)
 PATCH  http://localhost:3000/api/characters/a02b91bc-3769-4221-beb1-d7a3aeba7dad
 Content-Type: application/json
 
@@ -36,3 +36,6 @@ Content-Type: application/json
     "attack": 150,
     "items": ["Lightsaber", "Reloj"]
 }
+
+###borrar un character
+DELETE http://localhost:3000/api/characters/a02b91bc-3769-4221-beb1-d7a3aeba7dad 
