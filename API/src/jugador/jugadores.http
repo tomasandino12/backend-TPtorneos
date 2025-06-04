@@ -1,0 +1,46 @@
+### obtener todos los characters
+GET http://localhost:3000/api/jugadores
+
+### obtener un character
+GET http://localhost:3000/api/jugadores/a02b91bc-3769-4221-beb1-d7a3aeba7dad
+
+### crear un nuevo character
+POST http://localhost:3000/api/jugadores
+Content-Type: application/json
+
+{
+    "nombre": "Jerónimo",                               
+    "apellido": "Cacciabue",
+    "dni": "42478149" ,
+    "email": "jeroCaccia@gmail.com",
+    "fechaNacimiento": "28/10/03",
+    "posicion": "mediocampista ofensivo"
+}
+
+
+### modificar un character (put idempotente (modif completas), en patch no necesario(modif parciales))
+PUT http://localhost:3000/api/jugadores/a02b91bc-3769-4221-beb1-d7a3aeba7dad
+Content-Type: application/json
+
+{
+    "nombre": "Gonzalo",                               
+    "apellido": "Maroni",
+    "dni": "40288199" ,
+    "email": "gMaroni@yahoo.com",
+    "fechaNacimiento": "18/05/00",
+    "posicion": "mediocampista ofensivo"
+}
+
+
+### modificar parcialmente un character  (sirve para modificaciones incrementales tambien, como subir un nivel o agregar un item)
+PATCH  http://localhost:3000/api/jugadores/a02b91bc-3769-4221-beb1-d7a3aeba7dad
+Content-Type: application/json
+
+{
+    "nombre": "Juan Roman",                               
+    "apellido": "Riquelme",
+    "email": "romanRiq@hotmail.com"
+}
+
+###borrar un character
+DELETE http://localhost:3000/api/jugadores/a02b91bc-3769-4221-beb1-d7a3aeba7dad 

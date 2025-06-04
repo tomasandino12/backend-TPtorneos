@@ -1,9 +1,9 @@
 import express from 'express'
-import { characterRouter } from './character/character.routes.js'
+import { jugadorRouter } from './jugador/jugador.routes.js'
 const app = express()
 app.use(express.json())  //middleware de express para usar (solo parchea json)
 
-app.use('/api/characters', characterRouter)    //que use ese router para todas las peticiones a esa url     uso router como unico elemento importado
+app.use('/api/jugadores', jugadorRouter)    //que use ese router para todas las peticiones a esa url     uso router como unico elemento importado
 
 app.use((_,res)=>{
     res.status(404).send({message: 'Resource not found'})            // manejador de errores y recursos (se podria incluir en el router)
