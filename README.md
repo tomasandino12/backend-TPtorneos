@@ -1,1 +1,1 @@
-Hasta ahora estoy haciendo todo el contenido de los videos del profe Meca y cuando termine el 12 y entienda bien que estoy haciendo y como hacer cada cosa intentare pasar todo lo que estoy viendo al ambito de nuestro proyecto
+Se me esta complicacndo el hecho de trabajar con la persistenacia, rearme un poco la estructura porque estaba hecha un desastre pero sigue sin funcionar el findAll correctamente
