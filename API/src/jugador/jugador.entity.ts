@@ -8,6 +8,6 @@ export class Jugador{
         public email: string,
         public fechaNacimiento: string,
         public posicion: string,
-        public idJugador = crypto.randomUUID()
+        public idJugador ?: number
     ) {}
 }
