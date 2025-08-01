@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 
-export class Jugador{
+export class Cancha{
     constructor(
         public nombre: string,
         public direccion: string,

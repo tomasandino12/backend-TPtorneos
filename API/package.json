@@ -4,9 +4,10 @@
   "type": "module",
   "description": "",
   "main": "app.js",
-  "scripts": {
-    "start:dev": "tsc-watch --noClear -p tsconfig.json --onSuccess \"node ./dist/API/src/app.js\""
-  },
+ "scripts": {
+  "build": "tsc -p ./tsconfig.json",
+  "start:dev": "tsc-watch --noClear -p tsconfig.json --onSuccess \"node ./dist/app.js\""
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
