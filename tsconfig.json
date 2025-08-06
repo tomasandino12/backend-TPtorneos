@@ -1,18 +1,19 @@
 {
   "compilerOptions": {
+    "incremental": true,
     "target": "es2020",
     "module": "ES2022",
     "moduleResolution": "bundler",
     "sourceMap": true,
-    "rootDir": "./API/src",
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "alwaysStrict": true,
     "skipLibCheck": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
   },
-  "include": ["API/src/**/*"],
+  "include": ["src/**/*", "**/*.ts"],
   "exclude": ["node_modules"]
 }
