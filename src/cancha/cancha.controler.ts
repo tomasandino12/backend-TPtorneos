@@ -1,68 +1,89 @@
-import { Request, Response, NextFunction } from "express"
-import { CanchaRepository } from "./cancha.repository.js"
-import { Cancha } from "./cancha.entity.mem.js"
+import { Request, Response, NextFunction } from 'express';
+import { orm } from '../shared/db/orm.js';
+import { Cancha } from './cancha.entity.js';
 
-const repository = new CanchaRepository()
+const em = orm.em;
 
+/** Sanitiza y normaliza el body */
 function sanitizeCanchaInput(req: Request, res: Response, next: NextFunction) {
-    req.body.sanitizedInput = {
-        nombre: req.body.nombre,
-        direccion: req.body.direccion,
-        tipoSuperficie: req.body.tipoSuperficie,
-        capacidad: req.body.capacidad
-    }
-    
-    Object.keys(req.body.sanitizedInput).forEach((key) => {
-        if (req.body.sanitizedInput[key] === undefined) {
-            delete req.body.sanitizedInput[key]
-        }
-    })
+  req.body.sanitizedInput = {
+    nombre: req.body.nombre,
+    direccion: req.body.direccion,
+    tipoSuperficie: req.body.tipoSuperficie,
+    capacidad: req.body.capacidad !== undefined ? Number(req.body.capacidad) : undefined,
+  };
 
-    next()
+  // elimina keys undefined
+  Object.keys(req.body.sanitizedInput).forEach((k) => {
+    if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
+  });
+
+  next();
 }
 
-function findAll(req: Request, res: Response) {
-    res.json({ data: repository.findAll() })
+/** GET /canchas */
+async function findAll(req: Request, res: Response) {
+  try {
+    const canchas = await em.find(Cancha, {}, { populate: ['partidos'] }); // quita 'partidos' si no querés poblar
+    res.status(200).json({ message: 'found all canchas', data: canchas });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function findOne(req: Request, res: Response) {
-    const cancha = repository.findOne({ id: req.params.id })
-    if (!cancha) {
-        res.status(404).send({ message: 'Cancha not found' })
-        return
-    }
-    res.json({ data: cancha })
+/** GET /canchas/:id */
+async function findOne(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const cancha = await em.findOneOrFail(Cancha, { id }, { populate: ['partidos'] });
+    res.status(200).json({ message: 'found cancha', data: cancha });
+  } catch (error: any) {
+    // si querés distinguir 404 vs 500, podés chequear error.name === 'NotFoundError'
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function add(req: Request, res: Response) {
-    const input = req.body.sanitizedInput
-    const canchaInput = new Cancha(input.nombre, input.direccion, input.tipoSuperficie, input.capacidad)
-
-    const cancha = repository.add(canchaInput)
-    res.status(201).send({ message: 'Cancha created', data: cancha })
+/** POST /canchas */
+async function add(req: Request, res: Response) {
+  try {
+    const cancha = em.create(Cancha, req.body.sanitizedInput);
+    await em.flush();
+    res.status(201).json({ message: 'cancha created', data: cancha });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function update(req: Request, res: Response) {
-    req.body.sanitizedInput.idCancha = req.params.id
-    const cancha = repository.update(req.body.sanitizedInput)
+/** PUT /canchas/:id  (o PATCH) */
+async function update(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    if (!cancha) {
-        res.status(404).send({ message: 'Cancha not found' })
-        return
-    }
+    const canchaToUpdate = await em.findOneOrFail(Cancha, { id });
+    em.assign(canchaToUpdate, req.body.sanitizedInput);
+    await em.flush();
 
-    res.status(200).send({ message: 'Cancha updated successfully', data: cancha })
+    res.status(200).json({ message: 'cancha updated', data: canchaToUpdate });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function remove(req: Request, res: Response) {
-    const id = req.params.id
-    const cancha = repository.delete({ id })
+/** DELETE /canchas/:id */
+async function remove(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    if (!cancha) {
-        res.status(404).send({ message: 'Cancha not found' })
-    } else {
-        res.status(200).send({ message: 'Cancha deleted successfully' })
-    }
+    const ref = em.getReference(Cancha, id);
+    await em.removeAndFlush(ref);
+    res.status(200).json({ message: 'cancha deleted' });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-export { sanitizeCanchaInput, findAll, findOne, add, update, remove }
+export { sanitizeCanchaInput, findAll, findOne, add, update, remove };
