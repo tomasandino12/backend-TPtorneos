@@ -1,6 +1,6 @@
 import { Repository } from "../shared/repository.js";
 import { Jugador } from "./jugador.entity.js";
-import { pool } from "../shared/db/conn.mysql.js";
+import { pool } from "../shared/db/orm.js";
 
 export class JugadorRepository implements Repository<Jugador>{
 

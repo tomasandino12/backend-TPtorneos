@@ -1,5 +1,5 @@
 import { CanchaRepository } from "./cancha.repository.js";
-import { Cancha } from "./cancha.entity.js";
+import { Cancha } from "./cancha.entity.mem.js";
 const repository = new CanchaRepository();
 function sanitizeCanchaInput(req, res, next) {
     req.body.sanitizedInput = {

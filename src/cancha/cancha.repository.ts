@@ -1,6 +1,6 @@
 import { Repository } from "../shared/repository.js"
 import { Cancha } from "./cancha.entity.mem.js"
-import { pool } from "../shared/db/conn.mysql.js"
+import { pool } from "../shared/db/orm.js"
 
 export class CanchaRepository implements Repository<Cancha> {
 

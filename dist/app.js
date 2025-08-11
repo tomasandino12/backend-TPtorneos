@@ -11,4 +11,5 @@ app.use((_, res) => {
 app.listen(3000, () => {
     console.log("Server running on http://localhost:3000/"); //inicializamos el servidor
 });
+//esta la posibilidad de hacer un routes.ts, de la misma jerarquia que app.ts, para simplificar aun mas el codigo
 //# sourceMappingURL=app.js.map
