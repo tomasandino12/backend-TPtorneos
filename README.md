@@ -12,3 +12,7 @@ No seguir haciendo la crud con los videos de SQL pasar directo a MicroORM, los v
 Le cambie el nombre a cancha.entity que hizo Gero a cancha.entity.mem porque el profe me dijo que cuando arranquemos con MicroORM vamos a decirle que arme las tablas diciendole donde encontrar los archivos que describan la entidad y que lo va a confundir tener 2 archivos que terminen en entity.ts por lo cual cambie el de Gero para poder probar eso luego cuando vea los videos.
 Igualmente no entendi como haria luego MicroORM para tener varias entidades y manejarlas en simultaneo. 
 CUALQUIER DUDA SACAR CONSULTA VIRTUAL EN VEZ DE HACERSE LIO, LITERALMENTE EN 20 MINUTOS LO RESUELVEN CON EL PROFE
+
+
+11/8 
+Luego de ver los primeros videos de MikroORM hice la actualizacion de controler, entity y routes de canchas. Tambien cree la CRUD partidos para poder probar las relaciones de MikroORM y como funcionan (en este caso probe la relacion de cancha y partidos que es de 1..n). 
