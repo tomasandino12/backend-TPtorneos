@@ -40,8 +40,10 @@ async function findOne(req: Request, res: Response) {
     const cancha = await em.findOneOrFail(Cancha, { id }, { populate: ['partidos'] });
     res.status(200).json({ message: 'found cancha', data: cancha });
   } catch (error: any) {
-    // si querés distinguir 404 vs 500, podés chequear error.name === 'NotFoundError'
-    res.status(500).json({ message: error.message });
+    if (error.name === 'NotFoundError') {
+    return res.status(404).json({ message: 'Cancha no encontrada' });
+  }
+  res.status(500).json({ message: error.message });
   }
 }
 
@@ -68,7 +70,10 @@ async function update(req: Request, res: Response) {
 
     res.status(200).json({ message: 'cancha updated', data: canchaToUpdate });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    if (error.name === 'NotFoundError') {
+    return res.status(404).json({ message: 'Cancha no encontrada' });
+  }
+  res.status(500).json({ message: error.message });
   }
 }
 

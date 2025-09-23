@@ -5,16 +5,16 @@ import { Partido } from '../partido/partido.entity.js';
 @Entity()
 export class Cancha extends BaseEntity {
 
-  @Property()
+  @Property({nullable:false})
   nombre!: string;
 
-  @Property()
+  @Property({nullable:false})
   direccion!: string;
 
-  @Property()
+  @Property({nullable:false})
   tipoSuperficie!: string;
 
-  @Property()
+  @Property({nullable:false})
   capacidad!: number;
 
   @OneToMany(() => Partido, p => p.cancha)

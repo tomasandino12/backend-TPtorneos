@@ -1,76 +1,92 @@
-import { Request, Response, NextFunction } from "express"
-import { JugadorRepository } from "./jugador.repository.js"
-import { Jugador } from "./jugador.entity.js"
+/*CODIGO NUEVO ADAPTADO A MIKROORM*/
+import { Request, Response, NextFunction } from 'express';
+import { orm } from '../shared/db/orm.js';
+import { Jugador } from './Jugador.entity.js';
 
-const repository = new JugadorRepository()
+const em = orm.em;
 
-function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction){
-    req.body.sanitizedInput = {
-        nombre: req.body.nombre,
-        apellido: req.body.apellido,
-        dni: req.body.dni,
-        email: req.body.email,
-        fechaNacimiento: req.body.fechaNacimiento,
-        posicion: req.body.posicion,
-    }
-    //aca deberia haber mas validaciones (tipos de datos, datos maliciosos,etc)
-    Object.keys(req.body.sanitizedInput).forEach((key) =>{
-        if(req.body.sanitizedInput[key] === undefined){
-            delete req.body.sanitizedInput[key]
-        }
-    })
-    next()
+/** Sanitiza y normaliza el body */
+function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
+  req.body.sanitizedInput = {
+    nombre: req.body.nombre,
+    apellido: req.body.apellido,
+    dni: req.body.dni,
+    email: req.body.email,
+    fechaNacimiento: req.body.fechaNacimiento,
+    posicion: req.body.posicion,
+  };
+
+  // elimina keys undefined
+  Object.keys(req.body.sanitizedInput).forEach((k) => {
+    if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
+  });
+
+  next();
 }
 
-function findAll(req:Request, res:Response) {
-    res.json({data : repository.findAll()})   
+/** GET /jugadores */
+async function findAll(req: Request, res: Response) {
+  try {
+    const jugadores = await em.find(Jugador, {});
+    res.status(200).json({ message: 'found all jugadores', data: jugadores });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function findOne(req:Request, res:Response) {
-const jugador = repository.findOne({id : req.params.id})  //no se si es req.params.id o idJugador pq no se si usa el nombre del id o es id del parametro
-if(!jugador) {
-    res.status(404).send({message: 'Jugador not found'})
-    return
-}
-res.json({data : jugador})  
-}
+/** GET /jugadores/:id */
+async function findOne(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-
-
-function add(req:Request, res:Response)  {                                         
-    const input = req.body.sanitizedInput                     
-    
-    const jugadorInput = new Jugador( input.nombre, input.apellido, input.dni, input.email, input.fechaNacimiento, input.posicion ) //creo q es pq no tengo el jugador repository pero ahora miro eso
-
-    const jugador = repository.add(jugadorInput)
-    res.status(201).send({message: 'Jugador created', data: jugador})
+    const jugador = await em.findOneOrFail(Jugador, { id });
+    res.status(200).json({ message: 'found jugador', data: jugador });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function update(req:Request, res:Response) {
-    req.body.sanitizedInput.idJugador = req.params.id
-    const jugador = repository.update(req.body.sanitizedInput)
-    
-    if(!jugador){
-        res.status(404).send({message: 'Jugador not found' })
-        return
-    }
-
-    res.status(200).send({message: 'Jugador updated successfully', data: jugador})
+/** POST /jugadores */
+async function add(req: Request, res: Response) {
+  try {
+    const jugador = em.create(Jugador, req.body.sanitizedInput);
+    await em.flush();
+    res.status(201).json({ message: 'jugador created', data: jugador });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
-function remove(req:Request, res:Response){
-    const id = req.params.id
-    const jugador = repository.delete({id})
+/** PUT /jugadores/:id */
+async function update(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
+    const jugadorToUpdate = await em.findOneOrFail(Jugador, { id });
+    em.assign(jugadorToUpdate, req.body.sanitizedInput);
+    await em.flush();
 
-    if(!jugador){
-        res.status(404).send({message: 'Jugador not found'})
-    }else{
-        res.status(200).send({message:'Jugador deleted successfully'})
-    }
+    res.status(200).json({ message: 'jugador updated', data: jugadorToUpdate });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 }
 
+/** DELETE /jugadores/:id */
+async function remove(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
+    const ref = em.getReference(Jugador, id);
+    await em.removeAndFlush(ref);
+    res.status(200).json({ message: 'jugador deleted' });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+}
 
+export { sanitizeJugadorInput, findAll, findOne, add, update, remove };
 
-export {sanitizeJugadorInput, findAll, findOne, add, update, remove}

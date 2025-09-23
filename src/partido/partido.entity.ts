@@ -5,21 +5,22 @@ import { Cancha } from '../cancha/cancha.entity.js';
 @Entity()
 export class Partido extends BaseEntity {
 
-  @Property()
+  @Property({ nullable: false })
   fecha_partido!: Date;
 
-  @Property()
-  hora_partido!: string;          
+  @Property({ nullable: false })
+  hora_partido!: string;
 
-  @Property()
-  estado_partido!: string;        
+  @Property({ nullable: false })
+  estado_partido!: string;
 
-  @Property()
+  @Property({ nullable: false })
   goles_local!: number;
 
-  @Property()
+  @Property({ nullable: false })
   goles_visitante!: number;
 
   @ManyToOne(() => Cancha)
   cancha!: Cancha;
 }
+
