@@ -1,4 +1,3 @@
-/*CODIGO NUEVO ADAPTADO A MIKROORM*/
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Jugador } from './jugador.entity.js';
@@ -14,6 +13,7 @@ function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
     email: req.body.email,
     fechaNacimiento: req.body.fechaNacimiento,
     posicion: req.body.posicion,
+    contraseña: req.body.contraseña, 
   };
 
   // elimina keys undefined
@@ -89,4 +89,3 @@ async function remove(req: Request, res: Response) {
 }
 
 export { sanitizeJugadorInput, findAll, findOne, add, update, remove };
-
