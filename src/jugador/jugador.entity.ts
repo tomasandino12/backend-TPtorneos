@@ -22,6 +22,9 @@ export class Jugador extends BaseEntity {
   @Property({ nullable: false })
   fechaNacimiento!: string;
 
+  @Property()
+  contraseña!: string;
+
   @Property({ nullable: false })
   posicion!: string;
  
