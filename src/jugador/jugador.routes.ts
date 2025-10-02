@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sanitizeJugadorInput, findAll, findOne, add, update, remove } from './Jugador.controller.js';
+import { sanitizeJugadorInput, findAll, findOne, add, update, remove } from './jugador.controler.js';
 
 export const jugadorRouter = Router();
 

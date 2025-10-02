@@ -1,7 +1,7 @@
 /*CODIGO NUEVO ADAPTADO A MIKROORM*/
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
-import { Jugador } from './Jugador.entity.js';
+import { Jugador } from './jugador.entity.js';
 
 const em = orm.em;
 

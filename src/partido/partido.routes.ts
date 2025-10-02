@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sanitizePartidoInput, findAll, findOne, add, update, remove } from './partido.controller.js';
+import { sanitizePartidoInput, findAll, findOne, add, update, remove } from './partido.controler.js';
 
 export const partidoRouter = Router();
 
