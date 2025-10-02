@@ -1,0 +1,18 @@
+import { Entity, Property } from '@mikro-orm/core';
+import { BaseEntity } from '../shared/db/baseEntity.entity.js';
+
+@Entity()
+export class Arbitro extends BaseEntity {
+
+  @Property({ nullable: false })
+  nombre!: string;
+
+  @Property({ nullable: false })
+  apellido!: string;
+
+  @Property({ nullable: false })
+  nro_matricula!: string;
+
+  @Property({ nullable: false })
+  email!: string;
+}
