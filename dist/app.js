@@ -1,15 +1,25 @@
+import 'reflect-metadata';
+import { RequestContext } from '@mikro-orm/core';
 import express from 'express';
-import { jugadorRouter } from './jugador/jugador.routes.js';
-import { canchaRouter } from './cancha/cancha.routes.js'; // 👈 nuevo import
+import { orm, syncSchema } from './shared/db/orm.js';
+import { apiRouter } from './routes.js';
 const app = express();
-app.use(express.json()); //middleware de express para usar (solo parchea json)
-app.use('/api/jugadores', jugadorRouter); //que use ese router para todas las peticiones a esa url
-app.use('/api/canchas', canchaRouter); // 👈 nuevo uso del router
+// Middleware para parsear JSON
+app.use(express.json());
+// RequestContext de MikroORM para cada request
+app.use((req, res, next) => {
+    RequestContext.create(orm.em, next);
+});
+// Montar todas las rutas a través de apiRouter bajo el prefijo /api
+app.use('/api', apiRouter);
+// Manejo de rutas no encontradas
 app.use((_, res) => {
-    res.status(404).send({ message: 'Resource not found' }); // manejador de errores
+    res.status(404).send({ message: 'Resource not found' });
 });
+// Sincronizar schema (solo en desarrollo)
+await syncSchema();
+// Inicialización del servidor
 app.listen(3000, () => {
-    console.log("Server running on http://localhost:3000/"); //inicializamos el servidor
+    console.log('Server running on http://localhost:3000/');
 });
-//esta la posibilidad de hacer un routes.ts, de la misma jerarquia que app.ts, para simplificar aun mas el codigo
 //# sourceMappingURL=app.js.map

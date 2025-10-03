@@ -1,54 +1,88 @@
-import { CanchaRepository } from "./cancha.repository.js";
-import { Cancha } from "./cancha.entity.mem.js";
-const repository = new CanchaRepository();
+import { orm } from '../shared/db/orm.js';
+import { Cancha } from './cancha.entity.js';
+const em = orm.em;
+/** Sanitiza y normaliza el body */
 function sanitizeCanchaInput(req, res, next) {
     req.body.sanitizedInput = {
         nombre: req.body.nombre,
         direccion: req.body.direccion,
         tipoSuperficie: req.body.tipoSuperficie,
-        capacidad: req.body.capacidad
+        capacidad: req.body.capacidad !== undefined ? Number(req.body.capacidad) : undefined,
     };
-    Object.keys(req.body.sanitizedInput).forEach((key) => {
-        if (req.body.sanitizedInput[key] === undefined) {
-            delete req.body.sanitizedInput[key];
-        }
+    // elimina keys undefined
+    Object.keys(req.body.sanitizedInput).forEach((k) => {
+        if (req.body.sanitizedInput[k] === undefined)
+            delete req.body.sanitizedInput[k];
     });
     next();
 }
-function findAll(req, res) {
-    res.json({ data: repository.findAll() });
-}
-function findOne(req, res) {
-    const cancha = repository.findOne({ id: req.params.id });
-    if (!cancha) {
-        res.status(404).send({ message: 'Cancha not found' });
-        return;
+/** GET /canchas */
+async function findAll(req, res) {
+    try {
+        const canchas = await em.find(Cancha, {}, { populate: ['partidos'] }); // quita 'partidos' si no querés poblar
+        res.status(200).json({ message: 'found all canchas', data: canchas });
     }
-    res.json({ data: cancha });
-}
-function add(req, res) {
-    const input = req.body.sanitizedInput;
-    const canchaInput = new Cancha(input.nombre, input.direccion, input.tipoSuperficie, input.capacidad);
-    const cancha = repository.add(canchaInput);
-    res.status(201).send({ message: 'Cancha created', data: cancha });
-}
-function update(req, res) {
-    req.body.sanitizedInput.idCancha = req.params.id;
-    const cancha = repository.update(req.body.sanitizedInput);
-    if (!cancha) {
-        res.status(404).send({ message: 'Cancha not found' });
-        return;
+    catch (error) {
+        res.status(500).json({ message: error.message });
     }
-    res.status(200).send({ message: 'Cancha updated successfully', data: cancha });
 }
-function remove(req, res) {
-    const id = req.params.id;
-    const cancha = repository.delete({ id });
-    if (!cancha) {
-        res.status(404).send({ message: 'Cancha not found' });
+/** GET /canchas/:id */
+async function findOne(req, res) {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id))
+            return res.status(400).json({ message: 'id inválido' });
+        const cancha = await em.findOneOrFail(Cancha, { id }, { populate: ['partidos'] });
+        res.status(200).json({ message: 'found cancha', data: cancha });
     }
-    else {
-        res.status(200).send({ message: 'Cancha deleted successfully' });
+    catch (error) {
+        if (error.name === 'NotFoundError') {
+            return res.status(404).json({ message: 'Cancha no encontrada' });
+        }
+        res.status(500).json({ message: error.message });
+    }
+}
+/** POST /canchas */
+async function add(req, res) {
+    try {
+        const cancha = em.create(Cancha, req.body.sanitizedInput);
+        await em.flush();
+        res.status(201).json({ message: 'cancha created', data: cancha });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}
+/** PUT /canchas/:id  (o PATCH) */
+async function update(req, res) {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id))
+            return res.status(400).json({ message: 'id inválido' });
+        const canchaToUpdate = await em.findOneOrFail(Cancha, { id });
+        em.assign(canchaToUpdate, req.body.sanitizedInput);
+        await em.flush();
+        res.status(200).json({ message: 'cancha updated', data: canchaToUpdate });
+    }
+    catch (error) {
+        if (error.name === 'NotFoundError') {
+            return res.status(404).json({ message: 'Cancha no encontrada' });
+        }
+        res.status(500).json({ message: error.message });
+    }
+}
+/** DELETE /canchas/:id */
+async function remove(req, res) {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id))
+            return res.status(400).json({ message: 'id inválido' });
+        const ref = em.getReference(Cancha, id);
+        await em.removeAndFlush(ref);
+        res.status(200).json({ message: 'cancha deleted' });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
     }
 }
 export { sanitizeCanchaInput, findAll, findOne, add, update, remove };

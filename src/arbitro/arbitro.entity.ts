@@ -1,5 +1,6 @@
-import { Entity, Property } from '@mikro-orm/core';
+import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
+import { Partido } from '../partido/partido.entity.js';
 
 @Entity()
 export class Arbitro extends BaseEntity {
@@ -15,4 +16,7 @@ export class Arbitro extends BaseEntity {
 
   @Property({ nullable: false })
   email!: string;
+
+  @OneToMany(() => Partido, partido => partido.arbitro)
+  partidos = new Collection<Partido>(this);
 }

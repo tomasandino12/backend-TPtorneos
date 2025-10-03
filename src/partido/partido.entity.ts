@@ -1,6 +1,9 @@
 import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
 import { Cancha } from '../cancha/cancha.entity.js';
+import { Participacion } from '../participacion/participacion.entity.js';
+import { Torneo } from '../torneo/torneo.entity.js';
+import { Arbitro } from '../arbitro/arbitro.entity.js';
 
 @Entity()
 export class Partido extends BaseEntity {
@@ -20,7 +23,19 @@ export class Partido extends BaseEntity {
   @Property({ nullable: false })
   goles_visitante!: number;
 
+  @ManyToOne(() => Torneo)
+  torneo!: Torneo;
+
   @ManyToOne(() => Cancha)
   cancha!: Cancha;
+
+  @ManyToOne(() => Arbitro)
+  arbitro!: Arbitro;
+
+  @ManyToOne(() => Participacion)
+  local!: Participacion;
+
+  @ManyToOne(() => Participacion)
+  visitante!: Participacion;
 }
 

@@ -4,9 +4,6 @@ import { Equipo } from '../equipo/equipo.entity.js';
 
 @Entity()
 export class Jugador extends BaseEntity {
-  @PrimaryKey()
-  id?: number;
-
   @Property({ nullable: false })
   nombre!: string;
 
@@ -22,7 +19,7 @@ export class Jugador extends BaseEntity {
   @Property({ nullable: false })
   fechaNacimiento!: string;
 
-  @Property()
+  @Property({ nullable: false })
   contraseña!: string;
 
   @Property({ nullable: false })
