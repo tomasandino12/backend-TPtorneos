@@ -6,7 +6,7 @@ import {
   add,
   update,
   remove,
-} from './torneo.controller.js';
+} from './torneo.controler.js';
 
 export const torneoRouter = Router();
 

@@ -1,5 +1,5 @@
 import { Entity, Property, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
-import { BaseEntity } from '../shared/db/baseEntity.entity';
+import { BaseEntity } from '../shared/db/baseEntity.entity.js';
 import { Partido } from '../partido/partido.entity.js';
 import { AdminTorneo } from '../adminTorneo/adminTorneo.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';

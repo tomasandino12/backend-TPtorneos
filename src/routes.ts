@@ -6,6 +6,7 @@ import { equipoRouter } from './equipo/equipo.routes.js';
 import { arbitroRouter } from './arbitro/arbitro.routes.js';
 import { adminTorneoRouter } from './adminTorneo/adminTorneo.routes.js';
 import { torneoRouter } from './torneo/torneo.routes.js';
+import { participacionRouter } from './participacion/participacion.routes.js';
 
 export const apiRouter = Router();
 
@@ -17,5 +18,6 @@ apiRouter.use('/equipos', equipoRouter);
 apiRouter.use('/arbitros', arbitroRouter);
 apiRouter.use('/adminTorneo', adminTorneoRouter);
 apiRouter.use('/torneo', torneoRouter);
+apiRouter.use('/participacion', participacionRouter);
 
 

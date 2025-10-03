@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sanitizeAdminTorneoInput, findAll, findOne, add, update, remove } from './adminTorneo.controller.js';
+import { sanitizeAdminTorneoInput, findAll, findOne, add, update, remove } from './adminTorneo.controler.js';
 
 export const adminTorneoRouter = Router();
 
