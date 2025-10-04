@@ -1,7 +1,5 @@
 import { Entity, Property, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
-import { Equipo } from '../equipo/equipo.entity.js';
-import { Torneo } from '../torneo/torneo.entity.js';
-import { Partido } from '../partido/partido.entity.js';
+import { Equipo, Torneo, Partido } from '../shared/db/entities.js';
 
 @Entity()
 export class Participacion {

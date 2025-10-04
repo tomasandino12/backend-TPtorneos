@@ -1,8 +1,6 @@
 import { Entity, Property, OneToMany, ManyToMany, Collection } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Jugador } from '../jugador/jugador.entity.js';
-import { Participacion } from '../participacion/participacion.entity.js';
-// import { Torneo } from '../torneo/torneo.entity.js';    hasta la creacion de la crud torneo dejarlo comentado
+import { Jugador, Participacion } from '../shared/db/entities.js';
 
 @Entity()
 export class Equipo extends BaseEntity {

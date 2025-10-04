@@ -1,8 +1,7 @@
 import { Entity, Property, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Partido } from '../partido/partido.entity.js';
-import { AdminTorneo } from '../adminTorneo/adminTorneo.entity.js';
-import { Participacion } from '../participacion/participacion.entity.js';
+import { Partido, AdminTorneo, Participacion } from '../shared/db/entities.js';
+
 
 @Entity()
 export class Torneo extends BaseEntity {

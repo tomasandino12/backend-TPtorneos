@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Partido } from '../partido/partido.entity.js';
+import { Partido } from '../shared/db/entities.js';
 export let Cancha = class Cancha extends BaseEntity {
     constructor() {
         super(...arguments);
@@ -33,7 +33,7 @@ __decorate([
     __metadata("design:type", Number)
 ], Cancha.prototype, "capacidad", void 0);
 __decorate([
-    OneToMany(() => Partido, p => p.cancha),
+    OneToMany(() => Partido, partido => partido.cancha),
     __metadata("design:type", Object)
 ], Cancha.prototype, "partidos", void 0);
 Cancha = __decorate([

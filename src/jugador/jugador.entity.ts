@@ -1,6 +1,6 @@
 import { Entity, PrimaryKey, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Equipo } from '../equipo/equipo.entity.js';
+import { Equipo } from '../shared/db/entities.js';
 
 @Entity()
 export class Jugador extends BaseEntity {
