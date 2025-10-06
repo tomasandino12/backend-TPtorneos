@@ -11,6 +11,7 @@ function sanitizeJugadorInput(req, res, next) {
         fechaNacimiento: req.body.fechaNacimiento,
         posicion: req.body.posicion,
         contraseña: req.body.contraseña,
+        equipo: req.body.equipo, // FK
     };
     // elimina keys undefined
     Object.keys(req.body.sanitizedInput).forEach((k) => {

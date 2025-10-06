@@ -1,0 +1,39 @@
+### Obtener todos los administradores de torneo
+GET http://localhost:3000/api/adminTorneo
+Content-Type: application/json
+
+
+### Crear un nuevo administrador de torneo
+POST http://localhost:3000/api/adminTorneo
+Content-Type: application/json
+
+{
+  "nombre": "Josemaria",
+  "apellido": "Alvanessi",
+  "email": "Ajosema@hotmail.com",
+  "contraseña": "admin123",
+  "telefono": "3413729381"
+}
+
+
+### Obtener un administrador por ID
+GET http://localhost:3000/api/adminTorneo/1
+Content-Type: application/json
+
+
+### Actualizar un administrador de torneo
+PUT http://localhost:3000/api/adminTorneo/1
+Content-Type: application/json
+
+{
+  "nombre": "María",
+  "apellido": "Gómez",
+  "email": "maria.gomez@example.com",
+  "contraseña": "admin1234",
+  "telefono": "3415559999"
+}
+
+
+### Eliminar un administrador de torneo
+DELETE http://localhost:3000/api/adminTorneo/1
+Content-Type: application/json

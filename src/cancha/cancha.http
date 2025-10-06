@@ -1,0 +1,41 @@
+### Obtener todas las canchas
+GET http://localhost:3000/api/canchas
+Content-Type: application/json
+
+###
+
+### Crear una cancha
+POST http://localhost:3000/api/canchas
+Content-Type: application/json
+
+{
+  "nombre": "Olimpicus",
+  "direccion": "Francia 1234",
+  "tipoSuperficie": "Fútbol 7",
+  "capacidad": 100
+}
+
+###
+
+### Obtener una cancha por ID
+GET http://localhost:3000/api/canchas/1
+Content-Type: application/json
+
+###
+
+### Actualizar una cancha
+PUT http://localhost:3000/api/canchas/1
+Content-Type: application/json
+
+{
+  "nombre": "Cancha Norte",
+  "direccion": "Ruta 33 Km 5",
+  "tipo": "Fútbol 5",
+  "capacidad": 10
+}
+
+###
+
+### Eliminar una cancha
+DELETE http://localhost:3000/api/canchas/1
+Content-Type: application/json

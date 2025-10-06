@@ -1,16 +1,16 @@
-import { Router } from 'express'
-import { sanitizeCanchaInput, findAll, findOne, add, update, remove } from './cancha.controler.js'
+import { Router } from 'express';
+import { sanitizeCanchaInput, findAll, findOne, add, update, remove } from './cancha.controler.js';
 
-export const canchaRouter = Router()
+export const canchaRouter = Router();
 
-canchaRouter.get('/', findAll)
+canchaRouter.get('/', findAll);
 
-canchaRouter.get('/:id', findOne)
+canchaRouter.get('/:id', findOne);
 
-canchaRouter.post('/', sanitizeCanchaInput, add)
+canchaRouter.post('/', sanitizeCanchaInput, add);
 
-canchaRouter.put('/:id', sanitizeCanchaInput, update)
+canchaRouter.put('/:id', sanitizeCanchaInput, update);
 
-canchaRouter.patch('/:id', sanitizeCanchaInput, update)
+canchaRouter.patch('/:id', sanitizeCanchaInput, update);
 
-canchaRouter.delete('/:id', remove)
+canchaRouter.delete('/:id', remove);

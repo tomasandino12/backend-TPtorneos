@@ -1,0 +1,39 @@
+### Obtener todos los torneos
+GET http://localhost:3000/api/torneo
+Content-Type: application/json
+
+
+### Obtener un torneo por ID
+GET http://localhost:3000/api/torneo/1
+Content-Type: application/json
+
+
+### Crear un nuevo torneo
+POST http://localhost:3000/api/torneo
+Content-Type: application/json
+
+{
+  "nombreTorneo": "Torneo Clausura 2025",
+  "fechaInicio": "2025-08-01",
+  "fechaFin": "2025-11-15",
+  "estado": "activo",
+  "adminTorneo": 4
+}
+
+
+### Actualizar un torneo existente
+PUT http://localhost:3000/api/torneo/1
+Content-Type: application/json
+
+{
+  "nombre": "Torneo Apertura 2025 - Actualizado",
+  "fechaInicio": "2025-03-10",
+  "fechaFin": "2025-07-20",
+  "estado": "en progreso",
+  "adminTorneo": 3
+}
+
+
+### Eliminar un torneo por ID
+DELETE http://localhost:3000/api/torneo/1
+Content-Type: application/json

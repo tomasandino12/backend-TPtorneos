@@ -1,0 +1,39 @@
+### Obtener todos los jugadores
+GET http://localhost:3000/api/equipos
+Content-Type: application/json
+
+
+### Crear un nuevo jugador
+POST http://localhost:3000/api/equipos
+Content-Type: application/json
+
+{
+  "nombreEquipo": "Tigres Enjaulados",
+  "colorCamiseta": "violeta y amarillo"
+}
+
+
+### Obtener un jugador por ID
+GET http://localhost:3000/api/equipos/1
+Content-Type: application/json
+
+
+### Actualizar un jugador existente
+PUT http://localhost:3000/api/equipos/1
+Content-Type: application/json
+
+{
+  "nombre": "Lucas",
+  "apellido": "Gómez",
+  "dni": "40256123",
+  "email": "lucas.gomez@example.com",
+  "fecha_nacimiento": "2000-08-15",
+  "contraseña": "nuevoPass123",
+  "posicion": "Mediocampista",
+  "equipo_id": 1
+}
+
+
+### Eliminar un jugador
+DELETE http://localhost:3000/api/equipos/1
+Content-Type: application/json
