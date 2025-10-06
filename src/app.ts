@@ -1,10 +1,13 @@
 import 'reflect-metadata';
 import { RequestContext } from '@mikro-orm/core';
+import cors from 'cors';
 import express from 'express';
 import { orm, syncSchema } from './shared/db/orm.js';
 import { apiRouter } from './routes.js';
 
 const app = express();
+
+app.use(cors());
 
 // Middleware para parsear JSON
 app.use(express.json());

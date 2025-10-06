@@ -1,5 +1,7 @@
 import { orm } from '../shared/db/orm.js';
 import { Jugador } from './jugador.entity.js';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 const em = orm.em;
 /** Sanitiza y normaliza el body */
 function sanitizeJugadorInput(req, res, next) {
@@ -46,7 +48,12 @@ async function findOne(req, res) {
 /** POST /jugadores */
 async function add(req, res) {
     try {
-        const jugador = em.create(Jugador, req.body.sanitizedInput);
+        const data = req.body.sanitizedInput;
+        // Hashea la contraseña antes de guardar
+        if (data.contraseña) {
+            data.contraseña = await bcrypt.hash(data.contraseña, 10); // ← fuerza 10
+        }
+        const jugador = em.create(Jugador, data);
         await em.flush();
         res.status(201).json({ message: 'jugador created', data: jugador });
     }
@@ -81,6 +88,31 @@ async function remove(req, res) {
     }
     catch (error) {
         res.status(500).json({ message: error.message });
+    }
+}
+/** POST /jugadores/login */
+export async function login(req, res) {
+    const { email, contraseña } = req.body;
+    try {
+        const jugador = await em.findOne(Jugador, { email });
+        if (!jugador) {
+            return res.status(401).json({ message: 'Jugador no encontrado' });
+        }
+        const contraseñaValida = await bcrypt.compare(contraseña, jugador.contraseña);
+        if (!contraseñaValida) {
+            return res.status(401).json({ message: 'Contraseña incorrecta' });
+        }
+        const token = jwt.sign({
+            id: jugador.id,
+            nombre: jugador.nombre,
+            email: jugador.email
+        }, 'secreto-super-seguro', // 🔐 Idealmente usar process.env.JWT_SECRET
+        { expiresIn: '2h' });
+        res.json({ token });
+    }
+    catch (error) {
+        console.error('Error al iniciar sesión:', error);
+        res.status(500).json({ message: 'Error en el servidor' });
     }
 }
 export { sanitizeJugadorInput, findAll, findOne, add, update, remove };

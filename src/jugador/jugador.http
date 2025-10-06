@@ -8,14 +8,14 @@ POST http://localhost:3000/api/jugadores
 Content-Type: application/json
 
 {
-  "nombre": "Juan",
-  "apellido": "Espinola",
-  "dni": "40983783",
-  "email": "noseq@yahoo.com",
-  "fechaNacimiento": "2001-10-23",
-  "contraseña": "mePelotean",
-  "posicion": "Arquero",
-  "equipo": 3
+  "nombre": "Raheem",
+  "apellido": "Sterling",
+  "dni": "38256123",
+  "email": "rajimS@hotmail.com",
+  "fechaNacimiento": "1998-07-23",
+  "contraseña": "cocoliso",
+  "posicion": "Delantero",
+  "equipo": 4
 }
 
 
