@@ -66,13 +66,24 @@ async function update(req, res) {
     try {
         const id = Number(req.params.id);
         if (Number.isNaN(id))
-            return res.status(400).json({ message: 'id inválido' });
+            return res.status(400).json({ message: "id inválido" });
         const jugadorToUpdate = await em.findOneOrFail(Jugador, { id });
-        em.assign(jugadorToUpdate, req.body.sanitizedInput);
+        // Clonamos los datos sanitizados
+        const data = { ...req.body.sanitizedInput };
+        // 🔒 Si viene una contraseña nueva, la codificamos antes de asignarla
+        if (data.contraseña) {
+            data.contraseña = await bcrypt.hash(data.contraseña, 10);
+        }
+        em.assign(jugadorToUpdate, data);
         await em.flush();
-        res.status(200).json({ message: 'jugador updated', data: jugadorToUpdate });
+        res.status(200).json({ message: "jugador updated", data: jugadorToUpdate });
     }
     catch (error) {
+        if (error.name === "NotFoundError") {
+            return res
+                .status(404)
+                .json({ message: "jugador no encontrado" });
+        }
         res.status(500).json({ message: error.message });
     }
 }

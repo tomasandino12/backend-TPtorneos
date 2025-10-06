@@ -8,11 +8,11 @@ POST http://localhost:3000/api/adminTorneo
 Content-Type: application/json
 
 {
-  "nombre": "Josemaria",
-  "apellido": "Alvanessi",
-  "email": "Ajosema@hotmail.com",
-  "contraseña": "admin123",
-  "telefono": "3413729381"
+  "nombre": "Ramon",
+  "apellido": "Carrillo",
+  "email": "Rcarrillo@gmail.com",
+  "contraseña": "chupetin33",
+  "telefono": "3413793081"
 }
 
 

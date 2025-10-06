@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { AdminTorneo } from './adminTorneo.entity.js';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const em = orm.em;
 
@@ -50,28 +52,47 @@ async function findOne(req: Request, res: Response) {
 /** POST /adminTorneo */
 async function add(req: Request, res: Response) {
   try {
-    const admin = em.create(AdminTorneo, req.body.sanitizedInput);
-    await em.flush();
-    res.status(201).json({ message: 'adminTorneo created', data: admin });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+      const data = req.body.sanitizedInput;
+  
+      // Hashea la contraseña antes de guardar
+      if (data.contraseña) {
+        data.contraseña = await bcrypt.hash(data.contraseña, 10); // ← fuerza 10
+      }
+  
+      const adminTorneo = em.create(AdminTorneo, data);
+      await em.flush();
+      res.status(201).json({ message: 'admin created', data: adminTorneo });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   }
-}
 
 /** PUT /adminTorneo/:id */
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+    if (Number.isNaN(id))
+      return res.status(400).json({ message: "id inválido" });
 
     const adminToUpdate = await em.findOneOrFail(AdminTorneo, { id });
-    em.assign(adminToUpdate, req.body.sanitizedInput);
+
+    // Clonamos los datos sanitizados
+    const data = { ...req.body.sanitizedInput };
+
+    // 🔒 Si viene una contraseña nueva, la codificamos antes de asignarla
+    if (data.contraseña) {
+      data.contraseña = await bcrypt.hash(data.contraseña, 10);
+    }
+
+    em.assign(adminToUpdate, data);
     await em.flush();
 
-    res.status(200).json({ message: 'adminTorneo updated', data: adminToUpdate });
+    res.status(200).json({ message: "adminTorneo updated", data: adminToUpdate });
   } catch (error: any) {
-    if (error.name === 'NotFoundError') {
-      return res.status(404).json({ message: 'AdminTorneo no encontrado' });
+    if (error.name === "NotFoundError") {
+      return res
+        .status(404)
+        .json({ message: "AdminTorneo no encontrado" });
     }
     res.status(500).json({ message: error.message });
   }
