@@ -7,6 +7,8 @@ const em = orm.em;
 /** Sanitiza y normaliza el body */
 function sanitizeParticipacionInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
+    equipo: req.body.equipo,
+    torneo: req.body.torneo,
     fecha_inscripcion: req.body.fecha_inscripcion,
   };
 
@@ -31,11 +33,10 @@ async function findAll(req: Request, res: Response) {
 /** GET /participaciones/:equipoId/:torneoId */
 async function findOne(req: Request, res: Response) {
   try {
-    const equipoId = Number(req.params.equipoId);
-    const torneoId = Number(req.params.torneoId);
-    if (Number.isNaN(equipoId) || Number.isNaN(torneoId)) return res.status(400).json({ message: 'ids inválidos' });
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const participacion = await em.findOneOrFail(Participacion, { equipo: equipoId, torneo: torneoId });
+    const participacion = await em.findOneOrFail(Participacion, { id });
     res.status(200).json({ message: 'found participacion', data: participacion });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -56,11 +57,10 @@ async function add(req: Request, res: Response) {
 /** PUT /participacion/:equipoId/:torneoId */
 async function update(req: Request, res: Response) {
   try {
-    const equipoId = Number(req.params.equipoId);
-    const torneoId = Number(req.params.torneoId);
-    if (Number.isNaN(equipoId) || Number.isNaN(torneoId)) return res.status(400).json({ message: 'ids inválidos' });
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const participacionToUpdate = await em.findOneOrFail(Participacion, { equipo: equipoId, torneo: torneoId });
+    const participacionToUpdate = await em.findOneOrFail(Participacion, { id });
     em.assign(participacionToUpdate, req.body.sanitizedInput);
     await em.flush();
 
@@ -73,26 +73,15 @@ async function update(req: Request, res: Response) {
 /** DELETE /participacion/:equipoId/:torneoId */
 async function remove(req: Request, res: Response) {
   try {
-    const equipoId = Number(req.params.equipoId);
-    const torneoId = Number(req.params.torneoId);
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    if (Number.isNaN(equipoId) || Number.isNaN(torneoId)) {
-      return res.status(400).json({ message: "ids inválidos" });
-    }
-
-    const result = await em.nativeDelete(Participacion, {
-      equipo: equipoId,
-      torneo: torneoId,
-    });
-
-    if (result === 0) {
-      return res.status(404).json({ message: "participacion no encontrada" });
-    }
-
-    res.status(200).json({ message: "participacion eliminada" });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
+    const ref = em.getReference(Participacion, id);
+        await em.removeAndFlush(ref);
+        res.status(200).json({ message: 'participacion deleted' });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
 }
 
 export { sanitizeParticipacionInput, findAll, findOne, add, update, remove };

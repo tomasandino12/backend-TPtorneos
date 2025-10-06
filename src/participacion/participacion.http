@@ -1,0 +1,35 @@
+### Obtener todas las participaciones
+GET http://localhost:3000/api/participacion
+Content-Type: application/json
+
+
+### Crear una nueva participación
+POST http://localhost:3000/api/participacion
+Content-Type: application/json
+
+{
+  "equipo": 4,
+  "torneo": 2,
+  "fecha_inscripcion": "2025-10-11"
+}
+
+
+### Obtener una participación por ID 
+GET http://localhost:3000/api/participacion/1
+Content-Type: application/json
+
+
+### Actualizar una participación existente
+PUT http://localhost:3000/api/participacion/1
+Content-Type: application/json
+
+{
+  "equipo": 1,
+  "torneo": 1,
+  "fecha_inscripcion": "2025-10-03"
+}
+
+
+### Eliminar una participación
+DELETE http://localhost:3000/api/participacion/1
+Content-Type: application/json

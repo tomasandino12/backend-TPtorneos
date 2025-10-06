@@ -1,13 +1,16 @@
-import { Entity, Property, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne, OneToMany, Collection, Unique } from '@mikro-orm/core';
+import { BaseEntity } from '../shared/db/baseEntity.entity.js';
 import { Equipo, Torneo, Partido } from '../shared/db/entities.js';
+import e from 'express';
 
 @Entity()
-export class Participacion {
+@Unique({ properties: ['torneo', 'equipo'] })
+export class Participacion extends BaseEntity {
 
-  @ManyToOne(() => Equipo, { primary: true })
+  @ManyToOne(() => Equipo)
   equipo!: Equipo;
 
-  @ManyToOne(() => Torneo, { primary: true })
+  @ManyToOne(() => Torneo)
   torneo!: Torneo;
 
   @Property()

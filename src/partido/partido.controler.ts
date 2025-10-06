@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Partido } from './partido.entity.js';
 import { Cancha } from '../cancha/cancha.entity.js';
+import { torneoRouter } from '../torneo/torneo.routes.js';
 
 const em = orm.em;
 
@@ -13,7 +14,11 @@ function sanitizePartidoInput(req: Request, _res: Response, next: NextFunction) 
     estado_partido: req.body.estado_partido,
     goles_local: req.body.goles_local,
     goles_visitante: req.body.goles_visitante,
-    canchaId: req.body.canchaId, // opcional
+    torneo: req.body.torneo,
+    cancha: req.body.cancha,
+    arbitro: req.body.arbitro,
+    local: req.body.local,
+    visitante: req.body.visitante,
   };
 
   Object.keys(req.body.sanitizedInput).forEach((k) => {

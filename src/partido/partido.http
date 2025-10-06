@@ -1,0 +1,47 @@
+### Obtener todos los partidos
+GET http://localhost:3000/api/partidos
+Content-Type: application/json
+
+
+### Crear un nuevo partido
+POST http://localhost:3000/api/partidos
+Content-Type: application/json
+
+{
+  "fecha_partido": "2025-10-11",
+  "hora_partido": "18:30:00",
+  "estado_partido": "Programado",
+  "goles_local": 0,
+  "goles_visitante": 0,    
+  "torneo": 1,
+  "cancha": 4,
+  "arbitro": 2,
+  "local": 1,
+  "visitante": 3 
+}
+
+
+### Obtener un partido por ID
+GET http://localhost:3000/api/partidos/1
+Content-Type: application/json
+
+
+### Actualizar un partido existente
+PUT http://localhost:3000/api/partidos/1
+Content-Type: application/json
+
+{
+  "torneo": { "id": 1 },
+  "equipoLocal": { "id": 1 },
+  "equipoVisitante": { "id": 2 },
+  "golesLocal": 2,
+  "golesVisitante": 2,
+  "fechaPartido": "2025-10-12",
+  "horaPartido": "19:00:00",
+  "estadoPartido": "Empatado"
+}
+
+
+### Eliminar un partido
+DELETE http://localhost:3000/api/partidos/1
+Content-Type: application/json

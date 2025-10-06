@@ -4,8 +4,8 @@ import { sanitizeParticipacionInput, findAll, findOne, add, update, remove } fro
 export const participacionRouter = Router();
 
 participacionRouter.get('/', findAll);
-participacionRouter.get('/:equipoId/:torneoId', findOne);
+participacionRouter.get('/:id', findOne);
 participacionRouter.post('/', sanitizeParticipacionInput, add);
-participacionRouter.put('/:equipoId/:torneoId', sanitizeParticipacionInput, update);
-participacionRouter.patch('/:equipoId/:torneoId', sanitizeParticipacionInput, update);
-participacionRouter.delete('/:equipoId/:torneoId', remove);
+participacionRouter.put('/:id', sanitizeParticipacionInput, update);
+participacionRouter.patch('/:id', sanitizeParticipacionInput, update);
+participacionRouter.delete('/:id', remove);

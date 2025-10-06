@@ -8,14 +8,14 @@ POST http://localhost:3000/api/jugadores
 Content-Type: application/json
 
 {
-  "nombre": "Lucas",
-  "apellido": "Gómez",
-  "dni": "40256123",
-  "email": "lucas.gomez@example.com",
-  "fecha_nacimiento": "2000-08-15",
-  "contraseña": "lucas123",
-  "posicion": "Delantero",
-  "equipo_id": 1
+  "nombre": "Juan",
+  "apellido": "Espinola",
+  "dni": "40983783",
+  "email": "noseq@yahoo.com",
+  "fechaNacimiento": "2001-10-23",
+  "contraseña": "mePelotean",
+  "posicion": "Arquero",
+  "equipo": 3
 }
 
 
