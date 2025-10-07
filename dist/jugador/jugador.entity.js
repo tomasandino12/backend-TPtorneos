@@ -41,7 +41,7 @@ __decorate([
     __metadata("design:type", String)
 ], Jugador.prototype, "posicion", void 0);
 __decorate([
-    ManyToOne(() => Equipo),
+    ManyToOne(() => Equipo, { nullable: true }),
     __metadata("design:type", Equipo)
 ], Jugador.prototype, "equipo", void 0);
 Jugador = __decorate([

@@ -16,10 +16,10 @@ function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
     fechaNacimiento: req.body.fechaNacimiento,
     posicion: req.body.posicion,
     contraseña: req.body.contraseña,
-    equipo: req.body.equipo, // FK
+    equipo: req.body.equipo, // FK (opcional)
   };
 
-  // elimina keys undefined
+  // Elimina keys undefined
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
@@ -55,9 +55,8 @@ async function add(req: Request, res: Response) {
   try {
     const data = req.body.sanitizedInput;
 
-    // Hashea la contraseña antes de guardar
     if (data.contraseña) {
-      data.contraseña = await bcrypt.hash(data.contraseña, 10); // ← fuerza 10
+      data.contraseña = await bcrypt.hash(data.contraseña, 10);
     }
 
     const jugador = em.create(Jugador, data);
@@ -76,11 +75,8 @@ async function update(req: Request, res: Response) {
       return res.status(400).json({ message: "id inválido" });
 
     const jugadorToUpdate = await em.findOneOrFail(Jugador, { id });
-
-    // Clonamos los datos sanitizados
     const data = { ...req.body.sanitizedInput };
 
-    // 🔒 Si viene una contraseña nueva, la codificamos antes de asignarla
     if (data.contraseña) {
       data.contraseña = await bcrypt.hash(data.contraseña, 10);
     }
@@ -91,9 +87,7 @@ async function update(req: Request, res: Response) {
     res.status(200).json({ message: "jugador updated", data: jugadorToUpdate });
   } catch (error: any) {
     if (error.name === "NotFoundError") {
-      return res
-        .status(404)
-        .json({ message: "jugador no encontrado" });
+      return res.status(404).json({ message: "jugador no encontrado" });
     }
     res.status(500).json({ message: error.message });
   }
@@ -136,7 +130,7 @@ export async function login(req: Request, res: Response) {
         nombre: jugador.nombre,
         email: jugador.email
       },
-      'secreto-super-seguro', // 🔐 Idealmente usar process.env.JWT_SECRET
+      process.env.JWT_SECRET || 'secreto-super-seguro',
       { expiresIn: '2h' }
     );
 
@@ -147,11 +141,47 @@ export async function login(req: Request, res: Response) {
   }
 }
 
+/** POST /jugadores/registro */
+async function register(req: Request, res: Response) {
+  try {
+    const datos = req.body.sanitizedInput;
+
+    if (!datos.email || !datos.contraseña)
+      return res.status(400).json({ message: "Email y contraseña requeridos" });
+
+    const existeJugador = await em.findOne(Jugador, { email: datos.email });
+    if (existeJugador)
+      return res.status(409).json({ message: "Ya existe un jugador con ese email" });
+
+    const hash = await bcrypt.hash(datos.contraseña, 10);
+
+    const nuevoJugador = em.create(Jugador, {
+      ...datos,
+      contraseña: hash,
+      equipo: null, // 👈 aseguramos que no falle
+    });
+
+    await em.persistAndFlush(nuevoJugador);
+
+    const token = jwt.sign(
+      { id: nuevoJugador.id },
+      process.env.JWT_SECRET || "secreto123",
+      { expiresIn: "2h" }
+    );
+
+    res.status(201).json({ token });
+  } catch (error: any) {
+    console.error("Error en registro:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+}
+
 export {
   sanitizeJugadorInput,
   findAll,
   findOne,
   add,
   update,
-  remove
+  remove,
+  register
 };
