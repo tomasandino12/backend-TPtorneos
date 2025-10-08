@@ -13,9 +13,9 @@ function sanitizeJugadorInput(req, res, next) {
         fechaNacimiento: req.body.fechaNacimiento,
         posicion: req.body.posicion,
         contraseña: req.body.contraseña,
-        equipo: req.body.equipo, // FK (opcional)
+        equipo: req.body.equipo ?? null,
+        esCapitan: req.body.esCapitan ?? false,
     };
-    // Elimina keys undefined
     Object.keys(req.body.sanitizedInput).forEach((k) => {
         if (req.body.sanitizedInput[k] === undefined)
             delete req.body.sanitizedInput[k];
@@ -45,6 +45,21 @@ async function findOne(req, res) {
         res.status(500).json({ message: error.message });
     }
 }
+/** GET /jugadores/by-email?email=... */
+async function findByEmail(req, res) {
+    try {
+        const email = req.query.email;
+        if (!email)
+            return res.status(400).json({ message: "Email requerido" });
+        const jugador = await em.findOne(Jugador, { email });
+        if (!jugador)
+            return res.status(404).json({ message: "Jugador no encontrado" });
+        res.status(200).json({ message: "found jugador", data: jugador });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}
 /** POST /jugadores */
 async function add(req, res) {
     try {
@@ -52,6 +67,8 @@ async function add(req, res) {
         if (data.contraseña) {
             data.contraseña = await bcrypt.hash(data.contraseña, 10);
         }
+        data.esCapitan = false;
+        data.equipo = null;
         const jugador = em.create(Jugador, data);
         await em.flush();
         res.status(201).json({ message: 'jugador created', data: jugador });
@@ -97,7 +114,7 @@ async function remove(req, res) {
     }
 }
 /** POST /jugadores/login */
-export async function login(req, res) {
+async function login(req, res) {
     const { email, contraseña } = req.body;
     try {
         const jugador = await em.findOne(Jugador, { email });
@@ -111,7 +128,7 @@ export async function login(req, res) {
         const token = jwt.sign({
             id: jugador.id,
             nombre: jugador.nombre,
-            email: jugador.email
+            email: jugador.email,
         }, process.env.JWT_SECRET || 'secreto-super-seguro', { expiresIn: '2h' });
         res.json({ token });
     }
@@ -133,16 +150,17 @@ async function register(req, res) {
         const nuevoJugador = em.create(Jugador, {
             ...datos,
             contraseña: hash,
-            equipo: null, // 👈 aseguramos que no falle
+            equipo: null,
+            esCapitan: false,
         });
         await em.persistAndFlush(nuevoJugador);
         const token = jwt.sign({ id: nuevoJugador.id }, process.env.JWT_SECRET || "secreto123", { expiresIn: "2h" });
-        res.status(201).json({ token });
+        res.status(201).json({ token, id: nuevoJugador.id });
     }
     catch (error) {
         console.error("Error en registro:", error);
         res.status(500).json({ message: "Error en el servidor" });
     }
 }
-export { sanitizeJugadorInput, findAll, findOne, add, update, remove, register };
+export { sanitizeJugadorInput, findAll, findOne, findByEmail, add, update, remove, register, login, };
 //# sourceMappingURL=jugador.controler.js.map

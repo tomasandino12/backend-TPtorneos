@@ -16,10 +16,10 @@ function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
     fechaNacimiento: req.body.fechaNacimiento,
     posicion: req.body.posicion,
     contraseña: req.body.contraseña,
-    equipo: req.body.equipo, // FK (opcional)
+    equipo: req.body.equipo ?? null,
+    esCapitan: req.body.esCapitan ?? false,
   };
 
-  // Elimina keys undefined
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
@@ -50,6 +50,21 @@ async function findOne(req: Request, res: Response) {
   }
 }
 
+/** GET /jugadores/by-email?email=... */
+async function findByEmail(req: Request, res: Response) {
+  try {
+    const email = req.query.email as string;
+    if (!email) return res.status(400).json({ message: "Email requerido" });
+
+    const jugador = await em.findOne(Jugador, { email });
+    if (!jugador) return res.status(404).json({ message: "Jugador no encontrado" });
+
+    res.status(200).json({ message: "found jugador", data: jugador });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
 /** POST /jugadores */
 async function add(req: Request, res: Response) {
   try {
@@ -58,6 +73,9 @@ async function add(req: Request, res: Response) {
     if (data.contraseña) {
       data.contraseña = await bcrypt.hash(data.contraseña, 10);
     }
+
+    data.esCapitan = false;
+    data.equipo = null;
 
     const jugador = em.create(Jugador, data);
     await em.flush();
@@ -71,8 +89,7 @@ async function add(req: Request, res: Response) {
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
-    if (Number.isNaN(id))
-      return res.status(400).json({ message: "id inválido" });
+    if (Number.isNaN(id)) return res.status(400).json({ message: "id inválido" });
 
     const jugadorToUpdate = await em.findOneOrFail(Jugador, { id });
     const data = { ...req.body.sanitizedInput };
@@ -108,7 +125,7 @@ async function remove(req: Request, res: Response) {
 }
 
 /** POST /jugadores/login */
-export async function login(req: Request, res: Response) {
+async function login(req: Request, res: Response) {
   const { email, contraseña } = req.body;
 
   try {
@@ -128,7 +145,7 @@ export async function login(req: Request, res: Response) {
       {
         id: jugador.id,
         nombre: jugador.nombre,
-        email: jugador.email
+        email: jugador.email,
       },
       process.env.JWT_SECRET || 'secreto-super-seguro',
       { expiresIn: '2h' }
@@ -158,7 +175,8 @@ async function register(req: Request, res: Response) {
     const nuevoJugador = em.create(Jugador, {
       ...datos,
       contraseña: hash,
-      equipo: null, // 👈 aseguramos que no falle
+      equipo: null,
+      esCapitan: false,
     });
 
     await em.persistAndFlush(nuevoJugador);
@@ -169,7 +187,7 @@ async function register(req: Request, res: Response) {
       { expiresIn: "2h" }
     );
 
-    res.status(201).json({ token });
+    res.status(201).json({ token, id: nuevoJugador.id });
   } catch (error: any) {
     console.error("Error en registro:", error);
     res.status(500).json({ message: "Error en el servidor" });
@@ -180,8 +198,10 @@ export {
   sanitizeJugadorInput,
   findAll,
   findOne,
+  findByEmail,
   add,
   update,
   remove,
-  register
+  register,
+  login,
 };

@@ -41,6 +41,10 @@ __decorate([
     __metadata("design:type", String)
 ], Jugador.prototype, "posicion", void 0);
 __decorate([
+    Property({ default: false }),
+    __metadata("design:type", Boolean)
+], Jugador.prototype, "esCapitan", void 0);
+__decorate([
     ManyToOne(() => Equipo, { nullable: true }),
     __metadata("design:type", Equipo)
 ], Jugador.prototype, "equipo", void 0);

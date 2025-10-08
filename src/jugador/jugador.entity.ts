@@ -24,6 +24,9 @@ export class Jugador extends BaseEntity {
 
   @Property({ nullable: false })
   posicion!: string;
+
+  @Property({ default: false })
+  esCapitan!: boolean;
  
   @ManyToOne(() => Equipo, { nullable: true })
   equipo?: Equipo;

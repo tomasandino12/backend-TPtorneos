@@ -1,15 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Equipo } from './equipo.entity.js';
+import { Jugador } from '../jugador/jugador.entity.js';
 
 const em = orm.em;
 
+/** Sanitiza el body */
 function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombreEquipo: req.body.nombreEquipo,
     colorCamiseta: req.body.colorCamiseta,
+    idJugador: req.body.idJugador, // 👈 identificamos quién lo crea
   };
 
+  // Elimina claves undefined
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
@@ -17,6 +21,7 @@ function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+/** GET /equipos */
 async function findAll(_req: Request, res: Response) {
   try {
     const equipos = await em.find(Equipo, {}, { populate: ['jugadores', 'participaciones'] });
@@ -26,6 +31,7 @@ async function findAll(_req: Request, res: Response) {
   }
 }
 
+/** GET /equipos/:id */
 async function findOne(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -40,18 +46,41 @@ async function findOne(req: Request, res: Response) {
   }
 }
 
+/** POST /equipos */
 async function add(req: Request, res: Response) {
   try {
-    const data = { ...req.body.sanitizedInput };
-    const equipo = em.create(Equipo, data);
-    await em.persistAndFlush(equipo);
+    const { nombreEquipo, colorCamiseta, idJugador } = req.body.sanitizedInput;
 
-    res.status(201).json({ message: 'equipo created', data: equipo });
+    // 1️⃣ Crear el equipo
+    const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorCamiseta });
+    await em.persistAndFlush(nuevoEquipo);
+
+    // 2️⃣ Buscar el jugador creador
+    const jugador = await em.findOne(Jugador, { id: idJugador });
+
+    if (jugador) {
+      // Verificar que no tenga ya un equipo
+      if (jugador.equipo) {
+        return res.status(400).json({ message: 'El jugador ya pertenece a un equipo' });
+      }
+
+      // Asignar equipo y marcar como capitán
+      jugador.equipo = nuevoEquipo;
+      jugador.esCapitan = true;
+      await em.flush();
+    }
+
+    res.status(201).json({
+      message: 'equipo created',
+      data: nuevoEquipo,
+    });
   } catch (e: any) {
+    console.error('Error al crear equipo:', e);
     res.status(500).json({ message: e.message });
   }
 }
 
+/** PUT /equipos/:id */
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -70,6 +99,7 @@ async function update(req: Request, res: Response) {
   }
 }
 
+/** DELETE /equipos/:id */
 async function remove(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
