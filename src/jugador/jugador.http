@@ -25,18 +25,18 @@ Content-Type: application/json
 
 
 ### Actualizar un jugador existente
-PUT http://localhost:3000/api/jugadores/1
+PUT http://localhost:3000/api/jugadores/4
 Content-Type: application/json
 
 {
-  "nombre": "Lucas",
-  "apellido": "Gómez",
-  "dni": "40256123",
-  "email": "lucas.gomez@example.com",
-  "fecha_nacimiento": "2000-08-15",
-  "contraseña": "nuevoPass123",
-  "posicion": "Mediocampista",
-  "equipo_id": 1
+  "nombre": "Simon",
+  "apellido": "Carrillo",
+  "dni": "40376153",
+  "email": "simonC3@example.com",
+  "fecha_nacimiento": "2000-10-25",
+  "contraseña": "carrillo",
+  "posicion": "Delantero",
+  "equipo": 5
 }
 
 

@@ -1,5 +1,6 @@
 import { orm } from '../shared/db/orm.js';
 import { Jugador } from './jugador.entity.js';
+import { Equipo } from '../equipo/equipo.entity.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 const em = orm.em;
@@ -60,6 +61,17 @@ async function findByEmail(req, res) {
         res.status(500).json({ message: error.message });
     }
 }
+async function getJugadoresSinEquipo(req, res) {
+    try {
+        const jugadores = await em.find(Jugador, { equipo: null });
+        res.json(jugadores);
+    }
+    catch (err) {
+        console.error("❌ Error al obtener jugadores sin equipo:", err);
+        res.status(400).json({ message: "Error desconocido" });
+        res.status(500).json({ message: "Error al obtener jugadores sin equipo" });
+    }
+}
 /** POST /jugadores */
 async function add(req, res) {
     try {
@@ -81,22 +93,39 @@ async function add(req, res) {
 async function update(req, res) {
     try {
         const id = Number(req.params.id);
-        if (Number.isNaN(id))
-            return res.status(400).json({ message: "id inválido" });
-        const jugadorToUpdate = await em.findOneOrFail(Jugador, { id });
-        const data = { ...req.body.sanitizedInput };
-        if (data.contraseña) {
-            data.contraseña = await bcrypt.hash(data.contraseña, 10);
+        const { nombre, apellido, dni, email, fechaNacimiento, posicion, equipo, esCapitan } = req.body.sanitizedInput;
+        const jugador = await em.findOne(Jugador, { id });
+        if (!jugador) {
+            return res.status(404).json({ message: "Jugador no encontrado" });
         }
-        em.assign(jugadorToUpdate, data);
+        if (equipo) {
+            const equipoEntidad = await em.findOne(Equipo, { id: Number(equipo) });
+            if (!equipoEntidad) {
+                return res.status(404).json({ message: "Equipo no encontrado" });
+            }
+            jugador.equipo = equipoEntidad;
+        }
+        // Actualizar otros campos si se mandan
+        if (nombre)
+            jugador.nombre = nombre;
+        if (apellido)
+            jugador.apellido = apellido;
+        if (dni)
+            jugador.dni = dni;
+        if (email)
+            jugador.email = email;
+        if (fechaNacimiento)
+            jugador.fechaNacimiento = fechaNacimiento;
+        if (posicion)
+            jugador.posicion = posicion;
+        if (esCapitan !== undefined)
+            jugador.esCapitan = esCapitan;
         await em.flush();
-        res.status(200).json({ message: "jugador updated", data: jugadorToUpdate });
+        return res.json({ message: "Jugador actualizado correctamente", jugador });
     }
     catch (error) {
-        if (error.name === "NotFoundError") {
-            return res.status(404).json({ message: "jugador no encontrado" });
-        }
-        res.status(500).json({ message: error.message });
+        console.error(error);
+        res.status(500).json({ message: "Error al actualizar jugador" });
     }
 }
 /** DELETE /jugadores/:id */
@@ -162,5 +191,5 @@ async function register(req, res) {
         res.status(500).json({ message: "Error en el servidor" });
     }
 }
-export { sanitizeJugadorInput, findAll, findOne, findByEmail, add, update, remove, register, login, };
+export { sanitizeJugadorInput, findAll, findOne, findByEmail, getJugadoresSinEquipo, add, update, remove, register, login, };
 //# sourceMappingURL=jugador.controler.js.map
