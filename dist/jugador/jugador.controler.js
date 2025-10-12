@@ -26,10 +26,11 @@ function sanitizeJugadorInput(req, res, next) {
 /** GET /jugadores */
 async function findAll(req, res) {
     try {
-        const jugadores = await em.find(Jugador, {});
-        res.status(200).json({ message: 'found all jugadores', data: jugadores });
+        const jugadores = await em.find(Jugador, {}, { populate: ["equipo"] });
+        res.status(200).json({ message: "found all jugadores", data: jugadores });
     }
     catch (error) {
+        console.error("Error en findAll:", error);
         res.status(500).json({ message: error.message });
     }
 }
@@ -38,11 +39,14 @@ async function findOne(req, res) {
     try {
         const id = Number(req.params.id);
         if (Number.isNaN(id))
-            return res.status(400).json({ message: 'id inválido' });
-        const jugador = await em.findOneOrFail(Jugador, { id });
-        res.status(200).json({ message: 'found jugador', data: jugador });
+            return res.status(400).json({ message: "id inválido" });
+        const jugador = await em.findOne(Jugador, { id }, { populate: ["equipo"] });
+        if (!jugador)
+            return res.status(404).json({ message: "Jugador no encontrado" });
+        res.status(200).json({ message: "found jugador", data: jugador });
     }
     catch (error) {
+        console.error("Error en findOne:", error);
         res.status(500).json({ message: error.message });
     }
 }
@@ -52,23 +56,24 @@ async function findByEmail(req, res) {
         const email = req.query.email;
         if (!email)
             return res.status(400).json({ message: "Email requerido" });
-        const jugador = await em.findOne(Jugador, { email });
+        const jugador = await em.findOne(Jugador, { email }, { populate: ["equipo"] });
         if (!jugador)
             return res.status(404).json({ message: "Jugador no encontrado" });
         res.status(200).json({ message: "found jugador", data: jugador });
     }
     catch (error) {
+        console.error("Error en findByEmail:", error);
         res.status(500).json({ message: error.message });
     }
 }
+/** GET /jugadores/sin-equipo */
 async function getJugadoresSinEquipo(req, res) {
     try {
         const jugadores = await em.find(Jugador, { equipo: null });
-        res.json(jugadores);
+        res.status(200).json({ message: "found jugadores sin equipo", data: jugadores });
     }
     catch (err) {
         console.error("❌ Error al obtener jugadores sin equipo:", err);
-        res.status(400).json({ message: "Error desconocido" });
         res.status(500).json({ message: "Error al obtener jugadores sin equipo" });
     }
 }
@@ -94,18 +99,52 @@ async function update(req, res) {
     try {
         const id = Number(req.params.id);
         const { nombre, apellido, dni, email, fechaNacimiento, posicion, equipo, esCapitan } = req.body.sanitizedInput;
-        const jugador = await em.findOne(Jugador, { id });
+        const jugador = await em.findOne(Jugador, { id }, { populate: ["equipo"] });
         if (!jugador) {
             return res.status(404).json({ message: "Jugador no encontrado" });
         }
-        if (equipo) {
+        // ==============================
+        // ⚙️ Si el jugador se está yendo de su equipo
+        // ==============================
+        if (equipo === null && jugador.equipo) {
+            const equipoAnterior = jugador.equipo;
+            // Eliminar relación
+            jugador.equipo = null;
+            jugador.esCapitan = false;
+            // Buscar los otros jugadores del mismo equipo
+            const otrosJugadores = await em.find(Jugador, { equipo: equipoAnterior, id: { $ne: jugador.id } }, { orderBy: { id: "ASC" } });
+            if (jugador.esCapitan) {
+                if (otrosJugadores.length > 0) {
+                    // Asignar nuevo capitán al jugador con menor ID
+                    otrosJugadores[0].esCapitan = true;
+                    await em.flush();
+                    console.log(`Nuevo capitán asignado: ${otrosJugadores[0].nombre}`);
+                }
+                else {
+                    // Si no hay otros jugadores → eliminar equipo
+                    await em.removeAndFlush(equipoAnterior);
+                    console.log("Equipo eliminado porque se quedó sin jugadores");
+                }
+            }
+            else if (otrosJugadores.length === 0) {
+                // Si no era capitán, pero era el último jugador
+                await em.removeAndFlush(equipoAnterior);
+                console.log("Equipo eliminado porque se quedó sin jugadores");
+            }
+        }
+        // ==============================
+        // ⚙️ Si se envía un nuevo equipo → asignarlo
+        // ==============================
+        else if (equipo) {
             const equipoEntidad = await em.findOne(Equipo, { id: Number(equipo) });
             if (!equipoEntidad) {
                 return res.status(404).json({ message: "Equipo no encontrado" });
             }
             jugador.equipo = equipoEntidad;
         }
-        // Actualizar otros campos si se mandan
+        // ==============================
+        // ⚙️ Actualizar otros campos
+        // ==============================
         if (nombre)
             jugador.nombre = nombre;
         if (apellido)
@@ -121,10 +160,10 @@ async function update(req, res) {
         if (esCapitan !== undefined)
             jugador.esCapitan = esCapitan;
         await em.flush();
-        return res.json({ message: "Jugador actualizado correctamente", jugador });
+        return res.json({ message: "Jugador actualizado correctamente", data: jugador });
     }
     catch (error) {
-        console.error(error);
+        console.error("Error en update jugador:", error);
         res.status(500).json({ message: "Error al actualizar jugador" });
     }
 }

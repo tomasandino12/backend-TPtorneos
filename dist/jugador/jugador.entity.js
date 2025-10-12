@@ -46,7 +46,7 @@ __decorate([
 ], Jugador.prototype, "esCapitan", void 0);
 __decorate([
     ManyToOne(() => Equipo, { nullable: true }),
-    __metadata("design:type", Equipo)
+    __metadata("design:type", Object)
 ], Jugador.prototype, "equipo", void 0);
 Jugador = __decorate([
     Entity()
