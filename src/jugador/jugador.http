@@ -8,15 +8,17 @@ POST http://localhost:3000/api/jugadores
 Content-Type: application/json
 
 {
-  "nombre": "Geronimo",
-  "apellido": "Negri",
-  "dni": "46494676",
-  "email": "geroNegri@gmail.com",
-  "fechaNacimiento": "2005-05-10",
-  "contraseña": "juanchon",
-  "posicion": "Delantero",
-  "equipo": 1
+  "nombre": "Ramon",
+  "apellido": "Alvarez",
+  "dni": "42293153",
+  "email": "ramons@gmail.com",
+  "fechaNacimiento": "2003-09-25",
+  "contraseña": "ramon",
+  "posicion": "Mediocampista",
+  "equipo": 2,
+  "esCapitan": true
 }
+
 
 
 ### Obtener un jugador por ID
@@ -29,14 +31,14 @@ PUT http://localhost:3000/api/jugadores/4
 Content-Type: application/json
 
 {
-  "nombre": "Simon",
-  "apellido": "Carrillo",
-  "dni": "40376153",
-  "email": "simonC3@example.com",
-  "fecha_nacimiento": "2000-10-25",
-  "contraseña": "carrillo",
+  "nombre": "Nacho",
+  "apellido": "Scocco",
+  "dni": "39293153",
+  "email": "leproso74@gmail.com",
+  "fecha_nacimiento": "2001-10-25",
+  "contraseña": "scocco",
   "posicion": "Delantero",
-  "equipo": 5
+  "equipo": 1
 }
 
 

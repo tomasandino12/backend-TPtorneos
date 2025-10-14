@@ -8,9 +8,9 @@ POST http://localhost:3000/api/participacion
 Content-Type: application/json
 
 {
-  "equipo": 4,
-  "torneo": 2,
-  "fecha_inscripcion": "2025-10-11"
+  "equipo": 5,
+  "torneo": 4,
+  "fecha_inscripcion": "2025-06-07"
 }
 
 

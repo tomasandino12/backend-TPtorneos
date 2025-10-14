@@ -8,16 +8,16 @@ POST http://localhost:3000/api/partidos
 Content-Type: application/json
 
 {
-  "fecha_partido": "2025-10-11",
+  "fecha_partido": "2025-09-11",
   "hora_partido": "18:30:00",
-  "estado_partido": "Programado",
-  "goles_local": 0,
-  "goles_visitante": 0,    
-  "torneo": 1,
-  "cancha": 4,
-  "arbitro": 2,
-  "local": 1,
-  "visitante": 3 
+  "estado_partido": "Finalizado",
+  "goles_local": 2,
+  "goles_visitante": 1,    
+  "torneo": 2,
+  "cancha": 2,
+  "arbitro": 3,
+  "local": 3,
+  "visitante": 2 
 }
 
 

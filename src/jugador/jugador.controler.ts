@@ -96,8 +96,8 @@ async function add(req: Request, res: Response) {
       data.contraseña = await bcrypt.hash(data.contraseña, 10);
     }
 
-    data.esCapitan = false;
-    data.equipo = null;
+    data.esCapitan = data.esCapitan ?? false;
+    data.equipo = data.equipo ?? null;
 
     const jugador = em.create(Jugador, data);
     await em.flush();
