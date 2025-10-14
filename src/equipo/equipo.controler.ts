@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Equipo } from './equipo.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
+import { Participacion } from '../participacion/participacion.entity.js';
 
 const em = orm.em;
 
@@ -37,7 +38,7 @@ async function findOne(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const equipo = await em.findOne(Equipo, { id }, { populate: ['jugadores', 'participaciones'] });
+    const equipo = await em.findOne(Equipo, { id }, { populate: ['jugadores', 'participaciones.partidosLocal', 'participaciones.partidosVisitante'] });
     if (!equipo) return res.status(404).json({ message: 'equipo not found' });
 
     res.status(200).json({ message: 'found equipo', data: equipo });
@@ -115,4 +116,84 @@ async function remove(req: Request, res: Response) {
   }
 }
 
-export { sanitizeEquipoInput, findAll, findOne, add, update, remove };
+/** GET /equipos/estadisticas/:torneoId */
+async function getEstadisticas(req: Request, res: Response) {
+  try {
+    const torneoId = Number(req.params.torneoId);
+    if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'torneoId inválido' });
+
+    // Obtener todas las participaciones del torneo
+    const participaciones = await em.find(Participacion, { torneo: torneoId }, { populate: ['equipo', 'partidosLocal', 'partidosVisitante'] });
+
+    const estadisticas = [];
+
+    for (const participacion of participaciones) {
+      const equipo = participacion.equipo;
+      let pj = 0, pg = 0, pe = 0, pp = 0, dg = 0, pts = 0;
+
+      // Partidos como local
+      for (const partido of participacion.partidosLocal) {
+        if (partido.estado_partido === 'finalizado') {
+          pj++;
+          if (partido.goles_local > partido.goles_visitante) {
+            pg++;
+            pts += 3;
+          } else if (partido.goles_local === partido.goles_visitante) {
+            pe++;
+            pts += 1;
+          } else {
+            pp++;
+          }
+          dg += partido.goles_local - partido.goles_visitante;
+        }
+      }
+
+      // Partidos como visitante
+      for (const partido of participacion.partidosVisitante) {
+        if (partido.estado_partido === 'finalizado') {
+          pj++;
+          if (partido.goles_visitante > partido.goles_local) {
+            pg++;
+            pts += 3;
+          } else if (partido.goles_visitante === partido.goles_local) {
+            pe++;
+            pts += 1;
+          } else {
+            pp++;
+          }
+          dg += partido.goles_visitante - partido.goles_local;
+        }
+      }
+
+      estadisticas.push({
+        id: equipo.id,
+        nombreEquipo: equipo.nombreEquipo,
+        pj,
+        pg,
+        pe,
+        pp,
+        dg,
+        pts,
+        posicion: 0 // placeholder
+      });
+    }
+
+    // Ordenar por pts desc, luego dg desc, luego pj desc
+    estadisticas.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.dg !== a.dg) return b.dg - a.dg;
+      return b.pj - a.pj;
+    });
+
+    // Agregar posición
+    estadisticas.forEach((est, index) => {
+      est.posicion = index + 1;
+    });
+
+    res.status(200).json({ message: 'estadisticas found', data: estadisticas });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
+export { sanitizeEquipoInput, findAll, findOne, add, update, remove, getEstadisticas };
