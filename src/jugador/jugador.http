@@ -43,5 +43,5 @@ Content-Type: application/json
 
 
 ### Eliminar un jugador
-DELETE http://localhost:3000/api/jugadores/1
+DELETE http://localhost:3000/api/jugadores/8
 Content-Type: application/json

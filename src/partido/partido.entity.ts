@@ -33,10 +33,10 @@ export class Partido extends BaseEntity {
   @ManyToOne(() => Arbitro)
   arbitro!: Arbitro;
 
-  @ManyToOne(() => Participacion)
+  @ManyToOne(() => Participacion, { inversedBy: 'partidosLocal' })
   local!: Participacion;
 
-  @ManyToOne(() => Participacion)
+  @ManyToOne(() => Participacion, { inversedBy: 'partidosVisitante' })
   visitante!: Participacion;
 }
 
