@@ -2,21 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Equipo } from './equipo.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
-import { Torneo } from '../torneo/torneo.entity.js';
-import { Partido } from '../partido/partido.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';
+import { Partido } from '../partido/partido.entity.js';
 
 const em = orm.em;
 
-/** Sanitiza el body */
+/** 🔹 Sanitiza el body */
 function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombreEquipo: req.body.nombreEquipo,
     colorCamiseta: req.body.colorCamiseta,
-    idJugador: req.body.idJugador, // 👈 identificamos quién lo crea
+    idJugador: req.body.idJugador, // jugador creador
   };
 
-  // Elimina claves undefined
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
@@ -24,7 +22,7 @@ function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
-/** GET /equipos */
+/** 🔹 GET /equipos */
 async function findAll(_req: Request, res: Response) {
   try {
     const equipos = await em.find(Equipo, {}, { populate: ['jugadores', 'participaciones'] });
@@ -38,26 +36,49 @@ async function findAll(_req: Request, res: Response) {
 async function findOne(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+    if (Number.isNaN(id)) return res.status(400).json({ message: "id inválido" });
 
-    const equipo = await em.findOne(Equipo, { id }, {
-      populate: [
-        'jugadores',
-        'participaciones.torneo',
-        'participaciones.equipo',
-        'participaciones.partidosLocal',
-        'participaciones.partidosVisitante'
-      ]
-    });
-    if (!equipo) return res.status(404).json({ message: 'equipo not found' });
+    const equipo = await em.findOne(
+      Equipo,
+      { id },
+      {
+        populate: [
+          "jugadores",
+          "participaciones.torneo",
+          "participaciones.partidosLocal",
+          "participaciones.partidosVisitante",
+          "participaciones.partidosLocal.visitante.equipo",
+          "participaciones.partidosVisitante.local.equipo",
+        ],
+        fields: [
+          "id",
+          "nombreEquipo",
+          "colorCamiseta",
+          "jugadores.id",
+          "jugadores.nombre",
+          "jugadores.apellido",
+          "jugadores.posicion",
+          "jugadores.fechaNacimiento",
+          "jugadores.esCapitan",
+          "participaciones.id",
+          "participaciones.torneo",
+          "participaciones.partidosLocal",
+          "participaciones.partidosVisitante",
+        ],
+      }
+    );
 
-    res.status(200).json({ message: 'found equipo', data: equipo });
+    if (!equipo) return res.status(404).json({ message: "equipo not found" });
+
+    res.status(200).json({ message: "found equipo", data: equipo });
   } catch (e: any) {
+    console.error("Error en findOne:", e);
     res.status(500).json({ message: e.message });
   }
 }
 
-/** POST /equipos */
+
+/** 🔹 POST /equipos */
 async function add(req: Request, res: Response) {
   try {
     const { nombreEquipo, colorCamiseta, idJugador } = req.body.sanitizedInput;
@@ -66,32 +87,25 @@ async function add(req: Request, res: Response) {
     const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorCamiseta });
     await em.persistAndFlush(nuevoEquipo);
 
-    // 2️⃣ Buscar el jugador creador
+    // 2️⃣ Asignar jugador creador como capitán
     const jugador = await em.findOne(Jugador, { id: idJugador });
-
     if (jugador) {
-      // Verificar que no tenga ya un equipo
       if (jugador.equipo) {
         return res.status(400).json({ message: 'El jugador ya pertenece a un equipo' });
       }
-
-      // Asignar equipo y marcar como capitán
       jugador.equipo = nuevoEquipo;
       jugador.esCapitan = true;
       await em.flush();
     }
 
-    res.status(201).json({
-      message: 'equipo created',
-      data: nuevoEquipo,
-    });
+    res.status(201).json({ message: 'equipo created', data: nuevoEquipo });
   } catch (e: any) {
     console.error('Error al crear equipo:', e);
     res.status(500).json({ message: e.message });
   }
 }
 
-/** PUT /equipos/:id */
+/** 🔹 PUT /equipos/:id */
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -100,8 +114,7 @@ async function update(req: Request, res: Response) {
     const equipoToUpdate = await em.findOne(Equipo, { id });
     if (!equipoToUpdate) return res.status(404).json({ message: 'equipo not found' });
 
-    const data = { ...req.body.sanitizedInput };
-    em.assign(equipoToUpdate, data);
+    em.assign(equipoToUpdate, req.body.sanitizedInput);
     await em.flush();
 
     res.status(200).json({ message: 'equipo updated', data: equipoToUpdate });
@@ -110,7 +123,7 @@ async function update(req: Request, res: Response) {
   }
 }
 
-/** DELETE /equipos/:id */
+/** 🔹 DELETE /equipos/:id */
 async function remove(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -126,26 +139,21 @@ async function remove(req: Request, res: Response) {
   }
 }
 
-/** GET /equipos/estadisticas/:torneoId */
+/** 🔹 GET /equipos/estadisticas/:torneoId */
 async function getEstadisticasTorneo(req: Request, res: Response) {
   try {
     const torneoId = Number(req.params.torneoId);
     if (Number.isNaN(torneoId))
       return res.status(400).json({ message: 'torneoId inválido' });
 
-    // ✅ Filtrar participaciones del torneo activo y traer los partidos completos
     const participaciones = await em.find(
       Participacion,
       { torneo: torneoId },
       {
         populate: [
           'equipo',
-          'partidosLocal.torneo',
-          'partidosVisitante.torneo',
-          'partidosLocal.local',
-          'partidosLocal.visitante',
-          'partidosVisitante.local',
-          'partidosVisitante.visitante',
+          'partidosLocal',
+          'partidosVisitante',
         ],
       }
     );
@@ -156,40 +164,32 @@ async function getEstadisticasTorneo(req: Request, res: Response) {
       const equipo = participacion.equipo;
       let pj = 0, pg = 0, pe = 0, pp = 0, dg = 0, pts = 0;
 
-      // ✅ Partidos como local
+      // Partidos como local
       for (const partido of participacion.partidosLocal) {
-        if (partido.torneo.id !== torneoId) continue; // filtrar por torneo
-        if (partido.estado_partido === 'Finalizado' || partido.estado_partido === 'finalizado') {
-          pj++;
-          if (partido.goles_local > partido.goles_visitante) {
-            pg++;
-            pts += 3;
-          } else if (partido.goles_local === partido.goles_visitante) {
-            pe++;
-            pts += 1;
-          } else {
-            pp++;
-          }
-          dg += partido.goles_local - partido.goles_visitante;
+        if (partido.estado_partido.toLowerCase() !== 'finalizado') continue;
+        pj++;
+        if (partido.goles_local > partido.goles_visitante) {
+          pg++; pts += 3;
+        } else if (partido.goles_local === partido.goles_visitante) {
+          pe++; pts += 1;
+        } else {
+          pp++;
         }
+        dg += partido.goles_local - partido.goles_visitante;
       }
 
-      // ✅ Partidos como visitante
+      // Partidos como visitante
       for (const partido of participacion.partidosVisitante) {
-        if (partido.torneo.id !== torneoId) continue;
-        if (partido.estado_partido === 'Finalizado' || partido.estado_partido === 'finalizado') {
-          pj++;
-          if (partido.goles_visitante > partido.goles_local) {
-            pg++;
-            pts += 3;
-          } else if (partido.goles_visitante === partido.goles_local) {
-            pe++;
-            pts += 1;
-          } else {
-            pp++;
-          }
-          dg += partido.goles_visitante - partido.goles_local;
+        if (partido.estado_partido.toLowerCase() !== 'finalizado') continue;
+        pj++;
+        if (partido.goles_visitante > partido.goles_local) {
+          pg++; pts += 3;
+        } else if (partido.goles_visitante === partido.goles_local) {
+          pe++; pts += 1;
+        } else {
+          pp++;
         }
+        dg += partido.goles_visitante - partido.goles_local;
       }
 
       estadisticas.push({
@@ -212,10 +212,7 @@ async function getEstadisticasTorneo(req: Request, res: Response) {
       return b.pj - a.pj;
     });
 
-    // Agregar posición
-    estadisticas.forEach((est, index) => {
-      est.posicion = index + 1;
-    });
+    estadisticas.forEach((est, index) => (est.posicion = index + 1));
 
     res.status(200).json({ message: 'estadisticas found', data: estadisticas });
   } catch (e: any) {
@@ -223,75 +220,57 @@ async function getEstadisticasTorneo(req: Request, res: Response) {
   }
 }
 
-// backend/controllers/equipoController.js
+/** 🔹 GET /equipos/:id/estadisticas */
 async function getEstadisticas(req: Request, res: Response) {
-  const  id  = Number(req.params.id);
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-  // 1️⃣ Buscar equipo con los partidos donde participó
-  const equipo = await em.findOne(Equipo, { id }, {
-  populate: ['participaciones.partidosLocal', 'participaciones.partidosVisitante']
-}) as Equipo;
+    const equipo = await em.findOne(
+      Equipo,
+      { id },
+      { populate: ['participaciones.partidosLocal', 'participaciones.partidosVisitante'] }
+    );
 
-if (!equipo) return res.status(404).json({ message: 'Equipo no encontrado' });
+    if (!equipo) return res.status(404).json({ message: 'Equipo no encontrado' });
 
+    const estadisticas = calcularEstadisticas(equipo);
 
-  // 2️⃣ Calcular estadísticas en backend
-  const estadisticas = calcularEstadisticas(equipo);
-
-  // 3️⃣ Retornar resultado “limpio”
-  res.json({ equipo: equipo.nombreEquipo, estadisticas });
+    res.status(200).json({ message: 'estadisticas found', data: estadisticas });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
 }
 
 function calcularEstadisticas(equipo: Equipo) {
-  let partidosJugados = 0;
-  let victorias = 0;
-  let empates = 0;
-  let derrotas = 0;
-  let golesAFavor = 0;
-  let golesEnContra = 0;
+  let victorias = 0, empates = 0, derrotas = 0;
 
   equipo.participaciones.getItems().forEach((p: Participacion) => {
-    // Partidos donde fue local
     p.partidosLocal?.getItems().forEach((partido: Partido) => {
-      const esLocal = partido.local.id === p.id;
-      if (!esLocal) return; // seguridad extra
-      if (partido.estado_partido !== 'Finalizado' && partido.estado_partido !== 'finalizado') return; // solo partidos finalizados
-
-      partidosJugados++;
-      golesAFavor += partido.goles_local;
-      golesEnContra += partido.goles_visitante;
-
+      if (partido.estado_partido.toLowerCase() !== 'finalizado') return;
       if (partido.goles_local > partido.goles_visitante) victorias++;
       else if (partido.goles_local === partido.goles_visitante) empates++;
       else derrotas++;
     });
 
-    // Partidos donde fue visitante
     p.partidosVisitante?.getItems().forEach((partido: Partido) => {
-      const esVisitante = partido.visitante.id === p.id;
-      if (!esVisitante) return; // seguridad extra
-      if (partido.estado_partido !== 'Finalizado' && partido.estado_partido !== 'finalizado') return; // solo partidos finalizados
-
-      partidosJugados++;
-      golesAFavor += partido.goles_visitante;
-      golesEnContra += partido.goles_local;
-
+      if (partido.estado_partido.toLowerCase() !== 'finalizado') return;
       if (partido.goles_visitante > partido.goles_local) victorias++;
       else if (partido.goles_visitante === partido.goles_local) empates++;
       else derrotas++;
     });
   });
 
-  return {
-    equipo: equipo.nombreEquipo,
-    partidosJugados,
-    victorias,
-    empates,
-    derrotas,
-    golesAFavor,
-    golesEnContra,
-    puntos: victorias * 3 + empates,
-  };
+  return { victorias, empates, derrotas };
 }
 
-export { sanitizeEquipoInput, findAll, findOne, add, update, remove, getEstadisticasTorneo, getEstadisticas };
+export {
+  sanitizeEquipoInput,
+  findAll,
+  findOne,
+  add,
+  update,
+  remove,
+  getEstadisticasTorneo,
+  getEstadisticas,
+};
