@@ -3,6 +3,7 @@ import { orm } from '../shared/db/orm.js';
 import { Equipo } from './equipo.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
 import { Torneo } from '../torneo/torneo.entity.js';
+import { Partido } from '../partido/partido.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';
 
 const em = orm.em;
@@ -43,6 +44,7 @@ async function findOne(req: Request, res: Response) {
       populate: [
         'jugadores',
         'participaciones.torneo',
+        'participaciones.equipo',
         'participaciones.partidosLocal',
         'participaciones.partidosVisitante'
       ]
@@ -125,7 +127,7 @@ async function remove(req: Request, res: Response) {
 }
 
 /** GET /equipos/estadisticas/:torneoId */
-async function getEstadisticas(req: Request, res: Response) {
+async function getEstadisticasTorneo(req: Request, res: Response) {
   try {
     const torneoId = Number(req.params.torneoId);
     if (Number.isNaN(torneoId))
@@ -221,4 +223,75 @@ async function getEstadisticas(req: Request, res: Response) {
   }
 }
 
-export { sanitizeEquipoInput, findAll, findOne, add, update, remove, getEstadisticas };
+// backend/controllers/equipoController.js
+async function getEstadisticas(req: Request, res: Response) {
+  const  id  = Number(req.params.id);
+
+  // 1️⃣ Buscar equipo con los partidos donde participó
+  const equipo = await em.findOne(Equipo, { id }, {
+  populate: ['participaciones.partidosLocal', 'participaciones.partidosVisitante']
+}) as Equipo;
+
+if (!equipo) return res.status(404).json({ message: 'Equipo no encontrado' });
+
+
+  // 2️⃣ Calcular estadísticas en backend
+  const estadisticas = calcularEstadisticas(equipo);
+
+  // 3️⃣ Retornar resultado “limpio”
+  res.json({ equipo: equipo.nombreEquipo, estadisticas });
+}
+
+function calcularEstadisticas(equipo: Equipo) {
+  let partidosJugados = 0;
+  let victorias = 0;
+  let empates = 0;
+  let derrotas = 0;
+  let golesAFavor = 0;
+  let golesEnContra = 0;
+
+  equipo.participaciones.getItems().forEach((p: Participacion) => {
+    // Partidos donde fue local
+    p.partidosLocal?.getItems().forEach((partido: Partido) => {
+      const esLocal = partido.local.id === p.id;
+      if (!esLocal) return; // seguridad extra
+      if (partido.estado_partido !== 'Finalizado' && partido.estado_partido !== 'finalizado') return; // solo partidos finalizados
+
+      partidosJugados++;
+      golesAFavor += partido.goles_local;
+      golesEnContra += partido.goles_visitante;
+
+      if (partido.goles_local > partido.goles_visitante) victorias++;
+      else if (partido.goles_local === partido.goles_visitante) empates++;
+      else derrotas++;
+    });
+
+    // Partidos donde fue visitante
+    p.partidosVisitante?.getItems().forEach((partido: Partido) => {
+      const esVisitante = partido.visitante.id === p.id;
+      if (!esVisitante) return; // seguridad extra
+      if (partido.estado_partido !== 'Finalizado' && partido.estado_partido !== 'finalizado') return; // solo partidos finalizados
+
+      partidosJugados++;
+      golesAFavor += partido.goles_visitante;
+      golesEnContra += partido.goles_local;
+
+      if (partido.goles_visitante > partido.goles_local) victorias++;
+      else if (partido.goles_visitante === partido.goles_local) empates++;
+      else derrotas++;
+    });
+  });
+
+  return {
+    equipo: equipo.nombreEquipo,
+    partidosJugados,
+    victorias,
+    empates,
+    derrotas,
+    golesAFavor,
+    golesEnContra,
+    puntos: victorias * 3 + empates,
+  };
+}
+
+export { sanitizeEquipoInput, findAll, findOne, add, update, remove, getEstadisticasTorneo, getEstadisticas };
