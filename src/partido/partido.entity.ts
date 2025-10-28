@@ -19,6 +19,9 @@ export class Partido extends BaseEntity {
   estado_partido!: string;
 
   @Property({ nullable: false })
+  jornada!: number;
+
+  @Property({ nullable: false })
   goles_local!: number;
 
   @Property({ nullable: false })

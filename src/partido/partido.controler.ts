@@ -12,6 +12,7 @@ function sanitizePartidoInput(req: Request, _res: Response, next: NextFunction) 
     fecha_partido: req.body.fecha_partido,
     hora_partido: req.body.hora_partido,
     estado_partido: req.body.estado_partido,
+    jornada: req.body.jornada,
     goles_local: req.body.goles_local,
     goles_visitante: req.body.goles_visitante,
     torneo: req.body.torneo,
@@ -112,4 +113,16 @@ async function remove(req: Request, res: Response) {
   }
 }
 
-export { sanitizePartidoInput, findAll, findOne, add, update, remove };
+/** GET /partidos/programados */
+async function findProgramados(_req: Request, res: Response) {
+  try {
+    const partidos = await em.find(Partido, { estado_partido: 'programado' }, {
+      populate: ['cancha', 'local.equipo', 'visitante.equipo', 'arbitro']
+    });
+    res.status(200).json({ message: 'found programados partidos', data: partidos });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
+export { sanitizePartidoInput, findAll, findOne, add, update, remove, findProgramados };
