@@ -125,4 +125,40 @@ async function findProgramados(_req: Request, res: Response) {
   }
 }
 
-export { sanitizePartidoInput, findAll, findOne, add, update, remove, findProgramados };
+async function getPartidosPorTorneo(req: Request, res: Response) {
+  try {
+    const torneoId = Number(req.params.id);
+    if (isNaN(torneoId)) {
+      return res.status(400).json({ message: "ID de torneo inválido." });
+    }
+
+    const partidos = await em.find(
+      Partido,
+      { torneo: torneoId },
+      {
+        populate: ["local.equipo", "visitante.equipo", "cancha", "torneo"],
+        orderBy: { fecha_partido: "ASC" },
+      }
+    );
+
+    if (!partidos.length) {
+      return res
+        .status(404)
+        .json({ message: "No se encontraron partidos para este torneo." });
+    }
+
+    return res.status(200).json({ data: partidos });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "Error al obtener los partidos del torneo." });
+  }
+}
+
+
+
+
+export { sanitizePartidoInput, findAll, findOne, add, update, remove, findProgramados,  getPartidosPorTorneo};
+
+
