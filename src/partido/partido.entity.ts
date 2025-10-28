@@ -21,10 +21,10 @@ export class Partido extends BaseEntity {
   @Property({ nullable: false })
   jornada!: number;
 
-  @Property({ nullable: false })
+  @Property({ nullable: true })
   goles_local!: number;
 
-  @Property({ nullable: false })
+  @Property({ nullable: true })
   goles_visitante!: number;
 
   @ManyToOne({entity: () => Torneo})
