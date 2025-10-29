@@ -12,7 +12,7 @@ function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombreEquipo: req.body.nombreEquipo,
     colorCamiseta: req.body.colorCamiseta,
-    idJugador: req.body.idJugador, // jugador creador
+    idJugador: req.body.idJugador, 
   };
 
   Object.keys(req.body.sanitizedInput).forEach((k) => {
@@ -83,11 +83,11 @@ async function add(req: Request, res: Response) {
   try {
     const { nombreEquipo, colorCamiseta, idJugador } = req.body.sanitizedInput;
 
-    // 1️⃣ Crear el equipo
+    
     const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorCamiseta });
     await em.persistAndFlush(nuevoEquipo);
 
-    // 2️⃣ Asignar jugador creador como capitán
+    
     const jugador = await em.findOne(Jugador, { id: idJugador });
     if (jugador) {
       if (jugador.equipo) {
@@ -205,7 +205,7 @@ async function getEstadisticasTorneo(req: Request, res: Response) {
       });
     }
 
-    // Ordenar
+    
     estadisticas.sort((a, b) => {
       if (b.pts !== a.pts) return b.pts - a.pts;
       if (b.dg !== a.dg) return b.dg - a.dg;

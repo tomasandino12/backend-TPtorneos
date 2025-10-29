@@ -17,7 +17,4 @@ export class Equipo extends BaseEntity {
   @OneToMany(() => Participacion, participacion => participacion.equipo)
   participaciones = new Collection<Participacion>(this);
 
-  // Si más adelante querés relacionarlo con Torneos, podés descomentar esto:
-  // @ManyToMany(() => Torneo, torneo => torneo.equipos)
-  // torneos = new Collection<Torneo>(this);
 }

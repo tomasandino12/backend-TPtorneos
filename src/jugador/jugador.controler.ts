@@ -127,9 +127,7 @@ async function update(req: Request, res: Response) {
       return res.status(404).json({ message: "Jugador no encontrado" });
     }
 
-    // ==============================
-    // ⚙️ Si el jugador se está yendo de su equipo
-    // ==============================
+
     if (equipo === null && jugador.equipo) {
       const equipoAnterior = jugador.equipo;
 
@@ -146,25 +144,23 @@ async function update(req: Request, res: Response) {
 
       if (jugador.esCapitan) {
         if (otrosJugadores.length > 0) {
-          // Asignar nuevo capitán al jugador con menor ID
+          
           otrosJugadores[0].esCapitan = true;
           await em.flush();
           console.log(`Nuevo capitán asignado: ${otrosJugadores[0].nombre}`);
         } else {
-          // Si no hay otros jugadores → eliminar equipo
+          
           await em.removeAndFlush(equipoAnterior);
           console.log("Equipo eliminado porque se quedó sin jugadores");
         }
       } else if (otrosJugadores.length === 0) {
-        // Si no era capitán, pero era el último jugador
+        
         await em.removeAndFlush(equipoAnterior);
         console.log("Equipo eliminado porque se quedó sin jugadores");
       }
     }
 
-    // ==============================
-    // ⚙️ Si se envía un nuevo equipo → asignarlo
-    // ==============================
+
     else if (equipo) {
       const equipoEntidad = await em.findOne(Equipo, { id: Number(equipo) });
       if (!equipoEntidad) {
@@ -173,9 +169,7 @@ async function update(req: Request, res: Response) {
       jugador.equipo = equipoEntidad;
     }
 
-    // ==============================
-    // ⚙️ Actualizar otros campos
-    // ==============================
+
     if (nombre) jugador.nombre = nombre;
     if (apellido) jugador.apellido = apellido;
     if (dni) jugador.dni = dni;
