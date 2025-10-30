@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 
 const em = orm.em;
 
-/** Sanitiza y normaliza el body */
+/** 🔹 Sanitiza y normaliza el body */
 function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombre: req.body.nombre,
@@ -29,7 +29,7 @@ function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/** GET /jugadores */
+/** 🔹 GET /jugadores */
 async function findAll(req: Request, res: Response) {
   try {
     const jugadores = await em.find(Jugador, {}, { populate: ["equipo"] });
@@ -40,7 +40,7 @@ async function findAll(req: Request, res: Response) {
   }
 }
 
-/** GET /jugadores/:id */
+/** 🔹 GET /jugadores/:id */
 async function findOne(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -58,7 +58,7 @@ async function findOne(req: Request, res: Response) {
   }
 }
 
-/** GET /jugadores/by-email?email=... */
+/** 🔹 GET /jugadores/by-email?email=... */
 async function findByEmail(req: Request, res: Response) {
   try {
     const email = req.query.email as string;
@@ -76,7 +76,7 @@ async function findByEmail(req: Request, res: Response) {
   }
 }
 
-/** GET /jugadores/sin-equipo */
+/** 🔹 GET /jugadores/sin-equipo */
 async function getJugadoresSinEquipo(req: Request, res: Response) {
   try {
     const jugadores = await em.find(Jugador, { equipo: null });
@@ -87,7 +87,7 @@ async function getJugadoresSinEquipo(req: Request, res: Response) {
   }
 }
 
-/** POST /jugadores */
+/** 🔹 POST /jugadores */
 async function add(req: Request, res: Response) {
   try {
     const data = req.body.sanitizedInput;
@@ -107,7 +107,7 @@ async function add(req: Request, res: Response) {
   }
 }
 
-/** PUT /jugadores/:id */
+/** 🔹 PUT /jugadores/:id */
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -127,40 +127,53 @@ async function update(req: Request, res: Response) {
       return res.status(404).json({ message: "Jugador no encontrado" });
     }
 
-
+    
     if (equipo === null && jugador.equipo) {
       const equipoAnterior = jugador.equipo;
 
-      // Eliminar relación
+      
+      const eraCapitan = jugador.esCapitan;
+
+      
       jugador.equipo = null;
       jugador.esCapitan = false;
 
-      // Buscar los otros jugadores del mismo equipo
+      
       const otrosJugadores = await em.find(
         Jugador,
         { equipo: equipoAnterior, id: { $ne: jugador.id } },
         { orderBy: { id: "ASC" } }
       );
 
-      if (jugador.esCapitan) {
+      if (eraCapitan) {
         if (otrosJugadores.length > 0) {
           
           otrosJugadores[0].esCapitan = true;
           await em.flush();
           console.log(`Nuevo capitán asignado: ${otrosJugadores[0].nombre}`);
+          return res.json({
+            message: "Nuevo capitán asignado automáticamente.",
+            data: jugador,
+          });
         } else {
           
           await em.removeAndFlush(equipoAnterior);
           console.log("Equipo eliminado porque se quedó sin jugadores");
+          return res.json({
+            message: "Equipo eliminado porque se quedó sin jugadores.",
+            data: jugador,
+          });
         }
       } else if (otrosJugadores.length === 0) {
-        
+       
         await em.removeAndFlush(equipoAnterior);
         console.log("Equipo eliminado porque se quedó sin jugadores");
+        return res.json({
+          message: "Equipo eliminado porque se quedó sin jugadores.",
+          data: jugador,
+        });
       }
     }
-
-
     else if (equipo) {
       const equipoEntidad = await em.findOne(Equipo, { id: Number(equipo) });
       if (!equipoEntidad) {
@@ -168,7 +181,6 @@ async function update(req: Request, res: Response) {
       }
       jugador.equipo = equipoEntidad;
     }
-
 
     if (nombre) jugador.nombre = nombre;
     if (apellido) jugador.apellido = apellido;
@@ -186,7 +198,7 @@ async function update(req: Request, res: Response) {
   }
 }
 
-/** DELETE /jugadores/:id */
+/** 🔹 DELETE /jugadores/:id */
 async function remove(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -201,7 +213,7 @@ async function remove(req: Request, res: Response) {
   }
 }
 
-/** POST /jugadores/login */
+/** 🔹 POST /jugadores/login */
 async function login(req: Request, res: Response) {
   const { email, contraseña } = req.body;
 
@@ -235,7 +247,7 @@ async function login(req: Request, res: Response) {
   }
 }
 
-/** POST /jugadores/registro */
+/** 🔹 POST /jugadores/registro */
 async function register(req: Request, res: Response) {
   try {
     const datos = req.body.sanitizedInput;
