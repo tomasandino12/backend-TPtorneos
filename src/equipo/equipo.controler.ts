@@ -11,8 +11,9 @@ const em = orm.em;
 function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombreEquipo: req.body.nombreEquipo,
-    colorCamiseta: req.body.colorCamiseta,
-    idJugador: req.body.idJugador, 
+    colorPrimario: req.body.colorPrimario,
+    colorSecundario: req.body.colorSecundario,
+    idJugador: req.body.idJugador,
   };
 
   Object.keys(req.body.sanitizedInput).forEach((k) => {
@@ -53,7 +54,8 @@ async function findOne(req: Request, res: Response) {
         fields: [
           "id",
           "nombreEquipo",
-          "colorCamiseta",
+          "colorPrimario",
+          "colorSecundario",
           "jugadores.id",
           "jugadores.nombre",
           "jugadores.apellido",
@@ -81,10 +83,9 @@ async function findOne(req: Request, res: Response) {
 /** 🔹 POST /equipos */
 async function add(req: Request, res: Response) {
   try {
-    const { nombreEquipo, colorCamiseta, idJugador } = req.body.sanitizedInput;
+    const { nombreEquipo, colorPrimario, colorSecundario, idJugador } = req.body.sanitizedInput;
 
-    
-    const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorCamiseta });
+    const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario });
     await em.persistAndFlush(nuevoEquipo);
 
     

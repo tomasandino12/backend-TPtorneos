@@ -9,7 +9,10 @@ export class Equipo extends BaseEntity {
   nombreEquipo!: string;
 
   @Property({ nullable: false })
-  colorCamiseta!: string;
+  colorPrimario!: string;
+
+  @Property({ nullable: true })
+  colorSecundario?: string;
 
   @OneToMany(() => Jugador, jugador => jugador.equipo)
   jugadores = new Collection<Jugador>(this);
