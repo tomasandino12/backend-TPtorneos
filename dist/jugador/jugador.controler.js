@@ -27,7 +27,8 @@ function sanitizeJugadorInput(req, res, next) {
 async function findAll(req, res) {
     try {
         const jugadores = await em.find(Jugador, {}, { populate: ["equipo"] });
-        res.status(200).json({ message: "found all jugadores", data: jugadores });
+        const jugadoresSeguros = jugadores.map(({ contraseña, ...resto }) => resto);
+        res.status(200).json({ message: "found all jugadores", data: jugadoresSeguros });
     }
     catch (error) {
         console.error("Error en findAll:", error);
@@ -43,7 +44,8 @@ async function findOne(req, res) {
         const jugador = await em.findOne(Jugador, { id }, { populate: ["equipo"] });
         if (!jugador)
             return res.status(404).json({ message: "Jugador no encontrado" });
-        res.status(200).json({ message: "found jugador", data: jugador });
+        const { contraseña, ...jugadorSinPassword } = jugador;
+        res.status(200).json({ message: "found jugador", data: jugadorSinPassword });
     }
     catch (error) {
         console.error("Error en findOne:", error);
@@ -59,7 +61,8 @@ async function findByEmail(req, res) {
         const jugador = await em.findOne(Jugador, { email }, { populate: ["equipo"] });
         if (!jugador)
             return res.status(404).json({ message: "Jugador no encontrado" });
-        res.status(200).json({ message: "found jugador", data: jugador });
+        const { contraseña, ...jugadorSinPassword } = jugador;
+        res.status(200).json({ message: "found jugador", data: jugadorSinPassword });
     }
     catch (error) {
         console.error("Error en findByEmail:", error);
@@ -70,7 +73,8 @@ async function findByEmail(req, res) {
 async function getJugadoresSinEquipo(req, res) {
     try {
         const jugadores = await em.find(Jugador, { equipo: null });
-        res.status(200).json({ message: "found jugadores sin equipo", data: jugadores });
+        const jugadoresSeguros = jugadores.map(({ contraseña, ...resto }) => resto);
+        res.status(200).json({ message: "found jugadores sin equipo", data: jugadoresSeguros });
     }
     catch (err) {
         console.error("❌ Error al obtener jugadores sin equipo:", err);
@@ -81,6 +85,12 @@ async function getJugadoresSinEquipo(req, res) {
 async function add(req, res) {
     try {
         const data = req.body.sanitizedInput;
+        if (!data.nombre || !data.apellido || !data.dni || !data.email || !data.contraseña) {
+            return res.status(400).json({ error: 'Faltan campos requeridos: nombre, apellido, dni, email, contraseña' });
+        }
+        const existente = await em.findOne(Jugador, { email: data.email });
+        if (existente)
+            return res.status(409).json({ error: 'Ya existe un jugador con ese email' });
         if (data.contraseña) {
             data.contraseña = await bcrypt.hash(data.contraseña, 10);
         }
@@ -88,7 +98,8 @@ async function add(req, res) {
         data.equipo = data.equipo ?? null;
         const jugador = em.create(Jugador, data);
         await em.flush();
-        res.status(201).json({ message: 'jugador created', data: jugador });
+        const { contraseña, ...jugadorSinPassword } = jugador;
+        res.status(201).json({ message: 'jugador created', data: jugadorSinPassword });
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -99,71 +110,88 @@ async function update(req, res) {
     try {
         const id = Number(req.params.id);
         const { nombre, apellido, dni, email, fechaNacimiento, posicion, equipo, esCapitan } = req.body.sanitizedInput;
-        const jugador = await em.findOne(Jugador, { id }, { populate: ["equipo"] });
-        if (!jugador) {
-            return res.status(404).json({ message: "Jugador no encontrado" });
+        // Pre-checks fuera de la transacción (solo lecturas, sin modificar nada)
+        const jugador = await em.findOne(Jugador, { id }, { populate: ['equipo'] });
+        if (!jugador)
+            return res.status(404).json({ message: 'Jugador no encontrado' });
+        if (equipo) {
+            const equipoExiste = await em.findOne(Equipo, { id: Number(equipo) });
+            if (!equipoExiste)
+                return res.status(404).json({ message: 'Equipo no encontrado' });
         }
-        if (equipo === null && jugador.equipo) {
-            const equipoAnterior = jugador.equipo;
-            const eraCapitan = jugador.esCapitan;
-            jugador.equipo = null;
-            jugador.esCapitan = false;
-            const otrosJugadores = await em.find(Jugador, { equipo: equipoAnterior, id: { $ne: jugador.id } }, { orderBy: { id: "ASC" } });
-            if (eraCapitan) {
-                if (otrosJugadores.length > 0) {
+        // Validar capitán único: chequeamos el equipo destino (actual o nuevo)
+        if (esCapitan === true) {
+            const targetEquipoId = equipo ? Number(equipo) : jugador.equipo?.id;
+            if (targetEquipoId) {
+                const capitan = await em.findOne(Jugador, { equipo: targetEquipoId, esCapitan: true, id: { $ne: id } });
+                if (capitan)
+                    return res.status(400).json({ error: 'El equipo ya tiene un capitán' });
+            }
+        }
+        // Toda la escritura en una sola transacción atómica.
+        // em.transactional() hace flush y commit al final, o rollback si lanza un error.
+        const result = await em.transactional(async (txEm) => {
+            const j = await txEm.findOneOrFail(Jugador, { id }, { populate: ['equipo'] });
+            let mensaje = 'Jugador actualizado correctamente';
+            if (equipo === null && j.equipo) {
+                // Caso: se quita al jugador del equipo
+                const equipoAnterior = j.equipo;
+                const eraCapitan = j.esCapitan;
+                j.equipo = null;
+                j.esCapitan = false;
+                const otrosJugadores = await txEm.find(Jugador, { equipo: equipoAnterior, id: { $ne: j.id } }, { orderBy: { id: 'ASC' } });
+                if (eraCapitan && otrosJugadores.length > 0) {
                     otrosJugadores[0].esCapitan = true;
-                    await em.flush();
+                    mensaje = 'Nuevo capitán asignado automáticamente.';
                     console.log(`Nuevo capitán asignado: ${otrosJugadores[0].nombre}`);
-                    return res.json({
-                        message: "Nuevo capitán asignado automáticamente.",
-                        data: jugador,
-                    });
                 }
-                else {
-                    await em.removeAndFlush(equipoAnterior);
-                    console.log("Equipo eliminado porque se quedó sin jugadores");
-                    return res.json({
-                        message: "Equipo eliminado porque se quedó sin jugadores.",
-                        data: jugador,
-                    });
+                else if (otrosJugadores.length === 0) {
+                    txEm.remove(equipoAnterior);
+                    mensaje = 'Equipo eliminado porque se quedó sin jugadores.';
+                    console.log('Equipo eliminado porque se quedó sin jugadores');
                 }
             }
-            else if (otrosJugadores.length === 0) {
-                await em.removeAndFlush(equipoAnterior);
-                console.log("Equipo eliminado porque se quedó sin jugadores");
-                return res.json({
-                    message: "Equipo eliminado porque se quedó sin jugadores.",
-                    data: jugador,
-                });
+            else if (equipo) {
+                // Caso: se asigna un nuevo equipo
+                // Fix #3: si ya tiene un equipo DISTINTO, desvincularlo primero
+                if (j.equipo && j.equipo.id !== Number(equipo)) {
+                    const equipoAnterior = j.equipo;
+                    const eraCapitan = j.esCapitan;
+                    j.esCapitan = false;
+                    j.equipo = null;
+                    const otrosJugadores = await txEm.find(Jugador, { equipo: equipoAnterior, id: { $ne: j.id } }, { orderBy: { id: 'ASC' } });
+                    if (eraCapitan && otrosJugadores.length > 0) {
+                        otrosJugadores[0].esCapitan = true;
+                    }
+                    else if (otrosJugadores.length === 0) {
+                        txEm.remove(equipoAnterior);
+                    }
+                }
+                const equipoEntidad = await txEm.findOneOrFail(Equipo, { id: Number(equipo) });
+                j.equipo = equipoEntidad;
             }
-        }
-        else if (equipo) {
-            const equipoEntidad = await em.findOne(Equipo, { id: Number(equipo) });
-            if (!equipoEntidad) {
-                return res.status(404).json({ message: "Equipo no encontrado" });
-            }
-            jugador.equipo = equipoEntidad;
-        }
-        if (nombre)
-            jugador.nombre = nombre;
-        if (apellido)
-            jugador.apellido = apellido;
-        if (dni)
-            jugador.dni = dni;
-        if (email)
-            jugador.email = email;
-        if (fechaNacimiento)
-            jugador.fechaNacimiento = fechaNacimiento;
-        if (posicion)
-            jugador.posicion = posicion;
-        if (esCapitan !== undefined)
-            jugador.esCapitan = esCapitan;
-        await em.flush();
-        return res.json({ message: "Jugador actualizado correctamente", data: jugador });
+            if (nombre)
+                j.nombre = nombre;
+            if (apellido)
+                j.apellido = apellido;
+            if (dni)
+                j.dni = dni;
+            if (email)
+                j.email = email;
+            if (fechaNacimiento)
+                j.fechaNacimiento = fechaNacimiento;
+            if (posicion)
+                j.posicion = posicion;
+            if (esCapitan !== undefined)
+                j.esCapitan = esCapitan;
+            const { contraseña, ...jugadorSinPassword } = j;
+            return { message: mensaje, data: jugadorSinPassword };
+        });
+        return res.json(result);
     }
     catch (error) {
-        console.error("Error en update jugador:", error);
-        res.status(500).json({ message: "Error al actualizar jugador" });
+        console.error('Error en update jugador:', error);
+        res.status(500).json({ message: 'Error al actualizar jugador' });
     }
 }
 /** 🔹 DELETE /jugadores/:id */
@@ -196,7 +224,7 @@ async function login(req, res) {
             id: jugador.id,
             nombre: jugador.nombre,
             email: jugador.email,
-        }, process.env.JWT_SECRET || 'secreto-super-seguro', { expiresIn: '2h' });
+        }, process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024', { expiresIn: '2h' });
         res.json({ token });
     }
     catch (error) {
@@ -221,7 +249,7 @@ async function register(req, res) {
             esCapitan: false,
         });
         await em.persistAndFlush(nuevoJugador);
-        const token = jwt.sign({ id: nuevoJugador.id }, process.env.JWT_SECRET || "secreto123", { expiresIn: "2h" });
+        const token = jwt.sign({ id: nuevoJugador.id }, process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024', { expiresIn: "2h" });
         res.status(201).json({ token, id: nuevoJugador.id });
     }
     catch (error) {

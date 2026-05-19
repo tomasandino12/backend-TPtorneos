@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Partido } from './partido.entity.js';
-import { Cancha } from '../cancha/cancha.entity.js';
-import { torneoRouter } from '../torneo/torneo.routes.js';
 
 const em = orm.em;
 
@@ -59,9 +57,12 @@ async function add(req: Request, res: Response) {
   try {
     const data = { ...req.body.sanitizedInput };
 
-    if (data.canchaId !== undefined) {
-      data.cancha = em.getReference(Cancha, Number(data.canchaId));
-      delete data.canchaId;
+    if (!data.torneo || !data.local || !data.visitante || !data.fecha_partido) {
+      return res.status(400).json({ error: 'Faltan campos requeridos: torneo, local, visitante, fecha_partido' });
+    }
+
+    if (data.local === data.visitante) {
+      return res.status(400).json({ error: 'El equipo local y visitante no pueden ser el mismo' });
     }
 
     const partido = em.create(Partido, data);
@@ -83,11 +84,6 @@ async function update(req: Request, res: Response) {
     if (!partidoToUpdate) return res.status(404).json({ message: 'partido not found' });
 
     const data = { ...req.body.sanitizedInput };
-    if (data.canchaId !== undefined) {
-      data.cancha = em.getReference(Cancha, Number(data.canchaId));
-      delete data.canchaId;
-    }
-
     em.assign(partidoToUpdate, data);
     await em.flush();
 
@@ -116,9 +112,14 @@ async function remove(req: Request, res: Response) {
 /** GET /partidos/programados */
 async function findProgramados(_req: Request, res: Response) {
   try {
-    const partidos = await em.find(Partido, { estado_partido: 'programado' }, {
-      populate: ['cancha', 'local.equipo', 'visitante.equipo', 'arbitro']
-    });
+    const partidos = await em.find(
+      Partido,
+      { estado_partido: { $like: 'programado' } },
+      {
+        populate: ['cancha', 'local.equipo', 'visitante.equipo', 'arbitro'],
+        orderBy: { fecha_partido: 'ASC' },
+      }
+    );
     res.status(200).json({ message: 'found programados partidos', data: partidos });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
@@ -142,17 +143,13 @@ async function getPartidosPorTorneo(req: Request, res: Response) {
     );
 
     if (!partidos.length) {
-      return res
-        .status(404)
-        .json({ message: "No se encontraron partidos para este torneo." });
+      return res.status(200).json({ message: "No hay partidos para este torneo.", data: [] });
     }
 
-    return res.status(200).json({ data: partidos });
+    return res.status(200).json({ message: "found partidos por torneo", data: partidos });
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Error al obtener los partidos del torneo." });
+    return res.status(500).json({ message: "Error al obtener los partidos del torneo." });
   }
 }
 

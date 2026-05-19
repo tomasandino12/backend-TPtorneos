@@ -26,7 +26,14 @@ function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
 /** 🔹 GET /equipos */
 async function findAll(_req: Request, res: Response) {
   try {
-    const equipos = await em.find(Equipo, {}, { populate: ['jugadores', 'participaciones'] });
+    const equipos = await em.find(Equipo, {}, {
+      populate: ['jugadores'],
+      fields: [
+        'id', 'nombreEquipo', 'colorPrimario', 'colorSecundario',
+        'jugadores.id', 'jugadores.nombre', 'jugadores.apellido',
+        'jugadores.posicion', 'jugadores.esCapitan', 'jugadores.fechaNacimiento',
+      ],
+    });
     res.status(200).json({ message: 'found all equipos', data: equipos });
   } catch (e: any) {
     res.status(500).json({ message: e.message });

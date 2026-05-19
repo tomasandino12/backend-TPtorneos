@@ -5,10 +5,10 @@ jugadorRouter.get('/', findAll);
 jugadorRouter.get('/by-email', findByEmail);
 jugadorRouter.get('/sin-equipo', getJugadoresSinEquipo);
 jugadorRouter.get('/:id', findOne);
+jugadorRouter.post('/login', login);
+jugadorRouter.post('/registro', sanitizeJugadorInput, register);
 jugadorRouter.post('/', sanitizeJugadorInput, add);
 jugadorRouter.put('/:id', sanitizeJugadorInput, update);
 jugadorRouter.patch('/:id', sanitizeJugadorInput, update);
 jugadorRouter.delete('/:id', remove);
-jugadorRouter.post('/login', login);
-jugadorRouter.post('/registro', sanitizeJugadorInput, register);
 //# sourceMappingURL=jugador.routes.js.map

@@ -27,18 +27,11 @@ Content-Type: application/json
 
 
 ### Actualizar un jugador existente
-PUT http://localhost:3000/api/jugadores/4
+PUT http://localhost:3000/api/jugadores/6
 Content-Type: application/json
 
 {
-  "nombre": "Nacho",
-  "apellido": "Scocco",
-  "dni": "39293153",
-  "email": "leproso74@gmail.com",
-  "fecha_nacimiento": "2001-10-25",
-  "contraseña": "scocco",
-  "posicion": "Delantero",
-  "equipo": 1
+  "posicion": "Defensor"
 }
 
 

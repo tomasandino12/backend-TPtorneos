@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { AdminTorneo } from './adminTorneo.entity.js';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 const em = orm.em;
@@ -27,7 +26,8 @@ function sanitizeAdminTorneoInput(req: Request, _res: Response, next: NextFuncti
 async function findAll(_req: Request, res: Response) {
   try {
     const admins = await em.find(AdminTorneo, {}, { populate: ['torneos'] });
-    res.status(200).json({ message: 'found all adminTorneos', data: admins });
+    const adminsSeguros = admins.map(({ contraseña, ...resto }) => resto);
+    res.status(200).json({ message: 'found all adminTorneos', data: adminsSeguros });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -40,7 +40,8 @@ async function findOne(req: Request, res: Response) {
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
     const admin = await em.findOneOrFail(AdminTorneo, { id }, { populate: ['torneos'] });
-    res.status(200).json({ message: 'found adminTorneo', data: admin });
+    const { contraseña, ...adminSinPassword } = admin;
+    res.status(200).json({ message: 'found adminTorneo', data: adminSinPassword });
   } catch (error: any) {
     if (error.name === 'NotFoundError') {
       return res.status(404).json({ message: 'AdminTorneo no encontrado' });
@@ -52,20 +53,21 @@ async function findOne(req: Request, res: Response) {
 /** POST /adminTorneo */
 async function add(req: Request, res: Response) {
   try {
-      const data = req.body.sanitizedInput;
-  
-      // Hashea la contraseña antes de guardar
-      if (data.contraseña) {
-        data.contraseña = await bcrypt.hash(data.contraseña, 10); // ← fuerza 10
-      }
-  
-      const adminTorneo = em.create(AdminTorneo, data);
-      await em.flush();
-      res.status(201).json({ message: 'admin created', data: adminTorneo });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    const data = req.body.sanitizedInput;
+
+    // Hashea la contraseña antes de guardar
+    if (data.contraseña) {
+      data.contraseña = await bcrypt.hash(data.contraseña, 10);
     }
+
+    const adminTorneo = em.create(AdminTorneo, data);
+    await em.flush();
+    const { contraseña, ...adminSinPassword } = adminTorneo;
+    res.status(201).json({ message: 'admin created', data: adminSinPassword });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
+}
 
 /** PUT /adminTorneo/:id */
 async function update(req: Request, res: Response) {
@@ -87,7 +89,8 @@ async function update(req: Request, res: Response) {
     em.assign(adminToUpdate, data);
     await em.flush();
 
-    res.status(200).json({ message: "adminTorneo updated", data: adminToUpdate });
+    const { contraseña, ...adminSinPassword } = adminToUpdate;
+    res.status(200).json({ message: "adminTorneo updated", data: adminSinPassword });
   } catch (error: any) {
     if (error.name === "NotFoundError") {
       return res

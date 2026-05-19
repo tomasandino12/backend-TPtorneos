@@ -2,7 +2,7 @@ import { orm } from '../shared/db/orm.js';
 import { Cancha } from './cancha.entity.js';
 const em = orm.em;
 /** Sanitiza y normaliza el body */
-function sanitizeCanchaInput(req, res, next) {
+function sanitizeCanchaInput(req, _res, next) {
     req.body.sanitizedInput = {
         nombre: req.body.nombre,
         direccion: req.body.direccion,
@@ -17,9 +17,9 @@ function sanitizeCanchaInput(req, res, next) {
     next();
 }
 /** GET /canchas */
-async function findAll(req, res) {
+async function findAll(_req, res) {
     try {
-        const canchas = await em.find(Cancha, {}, { populate: ['partidos'] }); // quita 'partidos' si no querés poblar
+        const canchas = await em.find(Cancha, {});
         res.status(200).json({ message: 'found all canchas', data: canchas });
     }
     catch (error) {

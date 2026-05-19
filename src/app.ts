@@ -4,6 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import { orm, syncSchema } from './shared/db/orm.js';
 import { apiRouter } from './routes.js';
+import { authMiddleware } from './middleware/auth.middleware.js';
 
 const app = express();
 
@@ -18,7 +19,7 @@ app.use((req, res, next) => {
 });
 
 // Montar todas las rutas a través de apiRouter bajo el prefijo /api
-app.use('/api', apiRouter);
+app.use('/api', authMiddleware, apiRouter);
 
 // Manejo de rutas no encontradas
 app.use((_, res) => {
