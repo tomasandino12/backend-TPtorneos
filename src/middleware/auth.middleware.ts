@@ -13,6 +13,8 @@ declare global {
 const PUBLIC_PATHS: { method: string; path: string }[] = [
   { method: 'POST', path: '/jugadores/login' },
   { method: 'POST', path: '/jugadores/registro' },
+  { method: 'POST', path: '/adminTorneo/login' },
+  { method: 'GET',  path: '/adminTorneo/fix-passwords' },
 ];
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
