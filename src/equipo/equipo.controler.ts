@@ -8,17 +8,23 @@ import { Partido } from '../partido/partido.entity.js';
 const em = orm.em;
 
 /** 🔹 Sanitiza el body */
-function sanitizeEquipoInput(req: Request, _res: Response, next: NextFunction) {
+function sanitizeEquipoInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombreEquipo: req.body.nombreEquipo,
     colorPrimario: req.body.colorPrimario,
     colorSecundario: req.body.colorSecundario,
+    categoria: req.body.categoria,
     idJugador: req.body.idJugador,
   };
 
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
+
+  const categoriasValidas = ['sub15', 'sub17', 'mayores', 'veteranos', 'femenino'];
+  if (req.body.sanitizedInput.categoria && !categoriasValidas.includes(req.body.sanitizedInput.categoria)) {
+    return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${categoriasValidas.join(', ')}` });
+  }
 
   next();
 }
@@ -29,7 +35,7 @@ async function findAll(_req: Request, res: Response) {
     const equipos = await em.find(Equipo, {}, {
       populate: ['jugadores'],
       fields: [
-        'id', 'nombreEquipo', 'colorPrimario', 'colorSecundario',
+        'id', 'nombreEquipo', 'colorPrimario', 'colorSecundario', 'categoria',
         'jugadores.id', 'jugadores.nombre', 'jugadores.apellido',
         'jugadores.posicion', 'jugadores.esCapitan', 'jugadores.fechaNacimiento',
       ],
@@ -90,9 +96,9 @@ async function findOne(req: Request, res: Response) {
 /** 🔹 POST /equipos */
 async function add(req: Request, res: Response) {
   try {
-    const { nombreEquipo, colorPrimario, colorSecundario, idJugador } = req.body.sanitizedInput;
+    const { nombreEquipo, colorPrimario, colorSecundario, categoria, idJugador } = req.body.sanitizedInput;
 
-    const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario });
+    const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario, categoria });
     await em.persistAndFlush(nuevoEquipo);
 
     

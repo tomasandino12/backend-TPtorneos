@@ -1,7 +1,8 @@
-import { Entity, Property, OneToMany, Collection, PrimaryKey } from '@mikro-orm/core';
+import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
 import { Jugador, Participacion } from '../shared/db/entities.js';
 
+// Categoria: 'sub15' | 'sub17' | 'mayores' | 'veteranos' | 'femenino'
 @Entity()
 export class Equipo extends BaseEntity {
 
@@ -13,6 +14,9 @@ export class Equipo extends BaseEntity {
 
   @Property({ nullable: true })
   colorSecundario?: string;
+
+  @Property({ nullable: false, default: 'veteranos' })
+  categoria!: string;
 
   @OneToMany(() => Jugador, jugador => jugador.equipo)
   jugadores = new Collection<Jugador>(this);

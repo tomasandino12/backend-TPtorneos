@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Participacion } from './participacion.entity.js';
+import { Equipo } from '../equipo/equipo.entity.js';
+import { Torneo } from '../torneo/torneo.entity.js';
 
 const em = orm.em;
 
@@ -57,8 +59,36 @@ async function findOne(req: Request, res: Response) {
 // 🔹 POST /participaciones
 async function add(req: Request, res: Response) {
   try {
+    const equipoId = Number(req.body.sanitizedInput.equipo);
+    const torneoId = Number(req.body.sanitizedInput.torneo);
+
+    const equipo = await em.findOne(Equipo, { id: equipoId });
+    if (!equipo) return res.status(404).json({ message: 'Equipo no encontrado' });
+
+    const torneo = await em.findOne(Torneo, { id: torneoId });
+    if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    // Validación 1: categoría del equipo coincide con la del torneo
+    if (equipo.categoria !== torneo.categoria) {
+      return res.status(400).json({
+        message: `La categoría del equipo (${equipo.categoria}) no coincide con la categoría del torneo (${torneo.categoria})`,
+      });
+    }
+
+    // Validación 2: el equipo no está en un torneo activo
+    const participacionActiva = await em.findOne(
+      Participacion,
+      { equipo: equipoId, torneo: { estado: 'en_curso' } },
+      { populate: ['torneo'] }
+    );
+    if (participacionActiva) {
+      return res.status(409).json({
+        message: `El equipo ya está participando en el torneo activo "${(participacionActiva.torneo as any).nombreTorneo}"`,
+      });
+    }
+
     const participacion = em.create(Participacion, req.body.sanitizedInput);
-    await em.flush();
+    await em.persistAndFlush(participacion);
     res.status(201).json({ message: 'participacion created', data: participacion });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
