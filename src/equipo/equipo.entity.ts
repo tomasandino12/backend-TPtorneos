@@ -18,6 +18,12 @@ export class Equipo extends BaseEntity {
   @Property({ nullable: false, default: 'veteranos' })
   categoria!: string;
 
+  @Property({ nullable: true })
+  descripcion?: string;
+
+  @Property({ nullable: true })
+  escudoUrl?: string;
+
   @OneToMany(() => Jugador, jugador => jugador.equipo)
   jugadores = new Collection<Jugador>(this);
 

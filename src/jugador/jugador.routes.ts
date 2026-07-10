@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sanitizeJugadorInput, findAll, findOne, findByEmail, getJugadoresSinEquipo, add, update, remove, register, login,} from './jugador.controler.js';
+import { sanitizeJugadorInput, findAll, findOne, findByEmail, getJugadoresSinEquipo, add, update, remove, register, login, forgotPassword, resetPassword,} from './jugador.controler.js';
 
 export const jugadorRouter = Router();
 
@@ -11,6 +11,8 @@ jugadorRouter.get('/:id', findOne);
 
 jugadorRouter.post('/login', login);
 jugadorRouter.post('/registro', sanitizeJugadorInput, register);
+jugadorRouter.post('/forgot-password', forgotPassword);
+jugadorRouter.post('/reset-password', resetPassword);
 jugadorRouter.post('/', sanitizeJugadorInput, add);
 jugadorRouter.put('/:id', sanitizeJugadorInput, update);
 jugadorRouter.patch('/:id', sanitizeJugadorInput, update);

@@ -1,4 +1,6 @@
+import 'dotenv/config';
 import 'reflect-metadata';
+import path from 'path';
 import { RequestContext } from '@mikro-orm/core';
 import cors from 'cors';
 import express from 'express';
@@ -17,6 +19,9 @@ app.use(express.json());
 app.use((req, res, next) => {
   RequestContext.create(orm.em, next);
 });
+
+// Archivos subidos (escudos, etc.) — fuera de /api para que no exijan Bearer token
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Montar todas las rutas a través de apiRouter bajo el prefijo /api
 app.use('/api', authMiddleware, apiRouter);

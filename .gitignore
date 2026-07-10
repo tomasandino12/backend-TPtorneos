@@ -7,6 +7,9 @@ coverage
 # dependency directory
 node_modules
 
+# archivos subidos por usuarios (escudos, etc.)
+uploads/
+
 # OS metadata
 .DS_Store
 Thumbs.db

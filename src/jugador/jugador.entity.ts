@@ -25,10 +25,19 @@ export class Jugador extends BaseEntity {
   @Property({ nullable: false })
   posicion!: string;
 
+  @Property({ nullable: true })
+  descripcion?: string;
+
   @Property({ default: false })
   esCapitan!: boolean;
- 
+
   @ManyToOne(() => Equipo, { nullable: true })
   equipo!: Equipo | null;
+
+  @Property({ nullable: true })
+  resetPasswordTokenHash?: string;
+
+  @Property({ nullable: true })
+  resetPasswordExpires?: Date;
 
 }

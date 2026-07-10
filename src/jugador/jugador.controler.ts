@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { orm } from '../shared/db/orm.js';
 import { Jugador } from './jugador.entity.js';
 import { Equipo } from '../equipo/equipo.entity.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
 
 const em = orm.em;
 
@@ -16,9 +18,10 @@ function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
     email: req.body.email,
     fechaNacimiento: req.body.fechaNacimiento,
     posicion: req.body.posicion,
+    descripcion: req.body.descripcion,
     contraseña: req.body.contraseña,
-    equipo: req.body.equipo ?? null,
-    esCapitan: req.body.esCapitan ?? false,
+    equipo: 'equipo' in req.body ? req.body.equipo : undefined,
+    esCapitan: req.body.esCapitan,
   };
 
   Object.keys(req.body.sanitizedInput).forEach((k) => {
@@ -130,6 +133,7 @@ async function update(req: Request, res: Response) {
       email,
       fechaNacimiento,
       posicion,
+      descripcion,
       equipo,
       esCapitan
     } = req.body.sanitizedInput;
@@ -137,6 +141,11 @@ async function update(req: Request, res: Response) {
     // Pre-checks fuera de la transacción (solo lecturas, sin modificar nada)
     const jugador = await em.findOne(Jugador, { id }, { populate: ['equipo'] });
     if (!jugador) return res.status(404).json({ message: 'Jugador no encontrado' });
+
+    if (email && email !== jugador.email) {
+      const emailEnUso = await em.findOne(Jugador, { email, id: { $ne: id } });
+      if (emailEnUso) return res.status(409).json({ message: 'Ese email ya está en uso' });
+    }
 
     if (equipo) {
       const equipoExiste = await em.findOne(Equipo, { id: Number(equipo) });
@@ -213,6 +222,7 @@ async function update(req: Request, res: Response) {
       if (email) j.email = email;
       if (fechaNacimiento) j.fechaNacimiento = fechaNacimiento;
       if (posicion) j.posicion = posicion;
+      if (descripcion !== undefined) j.descripcion = descripcion;
       if (esCapitan !== undefined) j.esCapitan = esCapitan;
 
       const { contraseña, ...jugadorSinPassword } = j;
@@ -312,6 +322,67 @@ async function register(req: Request, res: Response) {
   }
 }
 
+/** 🔹 POST /jugadores/forgot-password */
+async function forgotPassword(req: Request, res: Response) {
+  const { email } = req.body;
+  const mensajeGenerico = { message: 'Si el email existe, te enviamos un correo con instrucciones.' };
+
+  try {
+    if (!email) return res.status(400).json({ message: 'Email requerido' });
+
+    const jugador = await em.findOne(Jugador, { email });
+    if (jugador) {
+      const tokenPlano = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(tokenPlano).digest('hex');
+
+      jugador.resetPasswordTokenHash = tokenHash;
+      jugador.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+      await em.flush();
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const link = `${frontendUrl}/restablecer-password?token=${tokenPlano}`;
+
+      try {
+        await enviarMailRecuperacion(jugador.email, link);
+      } catch (mailError) {
+        console.error('Error al enviar mail de recuperación:', mailError);
+      }
+    }
+
+    res.status(200).json(mensajeGenerico);
+  } catch (error) {
+    console.error('Error en forgotPassword:', error);
+    res.status(200).json(mensajeGenerico);
+  }
+}
+
+/** 🔹 POST /jugadores/reset-password */
+async function resetPassword(req: Request, res: Response) {
+  try {
+    const { token, nuevaContraseña } = req.body;
+    if (!token || !nuevaContraseña) {
+      return res.status(400).json({ message: 'Token y nueva contraseña requeridos' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const jugador = await em.findOne(Jugador, { resetPasswordTokenHash: tokenHash });
+
+    if (!jugador || !jugador.resetPasswordExpires || jugador.resetPasswordExpires < new Date()) {
+      return res.status(400).json({ message: 'Token inválido o expirado' });
+    }
+
+    jugador.contraseña = await bcrypt.hash(nuevaContraseña, 10);
+    jugador.resetPasswordTokenHash = undefined;
+    jugador.resetPasswordExpires = undefined;
+    await em.flush();
+
+    res.status(200).json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    console.error('Error en resetPassword:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
+  }
+}
+
 export {
   sanitizeJugadorInput,
   findAll,
@@ -323,4 +394,6 @@ export {
   remove,
   register,
   login,
+  forgotPassword,
+  resetPassword,
 };
