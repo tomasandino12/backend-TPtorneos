@@ -1,0 +1,187 @@
+{
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\.vscode\\launch.json": {
+    "mtime": 1747433540.9722328,
+    "ast_hash": "2ed57b81404963c3f8ce1bee7d299664",
+    "semantic_hash": "2ed57b81404963c3f8ce1bee7d299664"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\package.json": {
+    "mtime": 1759776999.120502,
+    "ast_hash": "39839b3085ec8bae7b1fdf549d37865a",
+    "semantic_hash": "39839b3085ec8bae7b1fdf549d37865a"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\adminTorneo\\adminTorneo.controler.ts": {
+    "mtime": 1779214581.973494,
+    "ast_hash": "e3822fa2a46dcefe7125cf80c1e5184c",
+    "semantic_hash": "e3822fa2a46dcefe7125cf80c1e5184c"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\adminTorneo\\adminTorneo.entity.ts": {
+    "mtime": 1759601747.676303,
+    "ast_hash": "6fd6d3b912cf5c4aaa3ba0c9b2a51464",
+    "semantic_hash": "6fd6d3b912cf5c4aaa3ba0c9b2a51464"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\adminTorneo\\adminTorneo.routes.ts": {
+    "mtime": 1759528693.610634,
+    "ast_hash": "daf2e7f7138cfaa00df2fdca7e1b540a",
+    "semantic_hash": "daf2e7f7138cfaa00df2fdca7e1b540a"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\app.ts": {
+    "mtime": 1779215261.0189457,
+    "ast_hash": "3700cc5e549a3add78ffa98c3cf2eb4c",
+    "semantic_hash": "3700cc5e549a3add78ffa98c3cf2eb4c"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\arbitro\\arbitro.controler.ts": {
+    "mtime": 1759500466.4561853,
+    "ast_hash": "16c68cd847ac097d390e566459abed2f",
+    "semantic_hash": "16c68cd847ac097d390e566459abed2f"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\arbitro\\arbitro.entity.ts": {
+    "mtime": 1759601746.8048449,
+    "ast_hash": "cb1210c0d1505437b54079b5db4e6cba",
+    "semantic_hash": "cb1210c0d1505437b54079b5db4e6cba"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\arbitro\\arbitro.routes.ts": {
+    "mtime": 1759500466.4571822,
+    "ast_hash": "7d5e5fa57e5a2fa84e1249b0b5b16f33",
+    "semantic_hash": "7d5e5fa57e5a2fa84e1249b0b5b16f33"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\cancha\\cancha.controler.ts": {
+    "mtime": 1779218174.613352,
+    "ast_hash": "a9ff7759e44e7b594cb3049caa5b456f",
+    "semantic_hash": "a9ff7759e44e7b594cb3049caa5b456f"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\cancha\\cancha.entity.ts": {
+    "mtime": 1759602702.8127856,
+    "ast_hash": "5f4165595c40f434f807296e9bd1e686",
+    "semantic_hash": "5f4165595c40f434f807296e9bd1e686"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\cancha\\cancha.routes.ts": {
+    "mtime": 1759700467.3217533,
+    "ast_hash": "06a567406a6252ddd69d4787d8911ca5",
+    "semantic_hash": "06a567406a6252ddd69d4787d8911ca5"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\equipo\\equipo.controler.ts": {
+    "mtime": 1779217941.926051,
+    "ast_hash": "feaa645cec6ca7a0ddb2add2cd39f796",
+    "semantic_hash": "feaa645cec6ca7a0ddb2add2cd39f796"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\equipo\\equipo.entity.ts": {
+    "mtime": 1779212383.8361185,
+    "ast_hash": "7345f187c024ea4e8a15282f8c6e1771",
+    "semantic_hash": "7345f187c024ea4e8a15282f8c6e1771"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\equipo\\equipo.routes.ts": {
+    "mtime": 1760726305.4721842,
+    "ast_hash": "86d4fb6838edbe8d48106f863fb3911c",
+    "semantic_hash": "86d4fb6838edbe8d48106f863fb3911c"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\jugador\\jugador.controler.ts": {
+    "mtime": 1779217339.5970325,
+    "ast_hash": "a6d402df04362fae4a2082afa455182a",
+    "semantic_hash": "a6d402df04362fae4a2082afa455182a"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\jugador\\jugador.entity.ts": {
+    "mtime": 1760454884.3105175,
+    "ast_hash": "ec0f9e92517e7ac4de1d935113663b80",
+    "semantic_hash": "ec0f9e92517e7ac4de1d935113663b80"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\jugador\\jugador.routes.ts": {
+    "mtime": 1779214106.6809216,
+    "ast_hash": "082c6ca4165a4b258f2e3cc89a7ccc4a",
+    "semantic_hash": "082c6ca4165a4b258f2e3cc89a7ccc4a"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\middleware\\auth.middleware.ts": {
+    "mtime": 1779216215.5775356,
+    "ast_hash": "561c345b220a38d8e9f9a46264c01900",
+    "semantic_hash": "561c345b220a38d8e9f9a46264c01900"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\participacion\\participacion.controler.ts": {
+    "mtime": 1760801673.9228024,
+    "ast_hash": "a26dfc0c35dbe50b36e0e2a872089155",
+    "semantic_hash": "a26dfc0c35dbe50b36e0e2a872089155"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\participacion\\participacion.entity.ts": {
+    "mtime": 1759766657.4582548,
+    "ast_hash": "d7b3788a20938ee1011d048087779ef9",
+    "semantic_hash": "d7b3788a20938ee1011d048087779ef9"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\participacion\\participacion.routes.ts": {
+    "mtime": 1759767660.0402067,
+    "ast_hash": "d73816053f173557bbfe8c999a232459",
+    "semantic_hash": "d73816053f173557bbfe8c999a232459"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\partido\\partido.controler.ts": {
+    "mtime": 1779217794.5513296,
+    "ast_hash": "25733dd8a6fa1dc09dd2edec3007b4e9",
+    "semantic_hash": "25733dd8a6fa1dc09dd2edec3007b4e9"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\partido\\partido.entity.ts": {
+    "mtime": 1779238186.7021794,
+    "ast_hash": "e1b20b309f6ccb45c9d4c8e4916e7982",
+    "semantic_hash": "e1b20b309f6ccb45c9d4c8e4916e7982"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\partido\\partido.routes.ts": {
+    "mtime": 1761911749.5236475,
+    "ast_hash": "e12fed64aacad81cba06a31f01158ceb",
+    "semantic_hash": "e12fed64aacad81cba06a31f01158ceb"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\routes.ts": {
+    "mtime": 1759528633.7177887,
+    "ast_hash": "2145b0d04d92d454d73fd0009dbbca7c",
+    "semantic_hash": "2145b0d04d92d454d73fd0009dbbca7c"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\shared\\db\\baseEntity.entity.ts": {
+    "mtime": 1755103715.3325484,
+    "ast_hash": "d5529ad0c03083291f47bdee757eb46a",
+    "semantic_hash": "d5529ad0c03083291f47bdee757eb46a"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\shared\\db\\conn.mysql.ts": {
+    "mtime": 1759500300.6193793,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\shared\\db\\entities.ts": {
+    "mtime": 1759601595.6771972,
+    "ast_hash": "f679c0ab3b0151304b4d9576075e638e",
+    "semantic_hash": "f679c0ab3b0151304b4d9576075e638e"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\shared\\db\\orm.ts": {
+    "mtime": 1760455096.0539,
+    "ast_hash": "087c6a28877a54ff85fa037431cc0984",
+    "semantic_hash": "087c6a28877a54ff85fa037431cc0984"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\shared\\repository.ts": {
+    "mtime": 1752589138.1872168,
+    "ast_hash": "45ad5da578d938110fb61935881ce304",
+    "semantic_hash": "45ad5da578d938110fb61935881ce304"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\torneo\\torneo.controler.ts": {
+    "mtime": 1759526886.1659014,
+    "ast_hash": "c05e44c7bfdf32c74cd377acc388f983",
+    "semantic_hash": "c05e44c7bfdf32c74cd377acc388f983"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\torneo\\torneo.entity.ts": {
+    "mtime": 1759601947.5051966,
+    "ast_hash": "639a4d547c5d3037745bef0d6f3428d1",
+    "semantic_hash": "639a4d547c5d3037745bef0d6f3428d1"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\src\\torneo\\torneo.routes.ts": {
+    "mtime": 1759528692.6642232,
+    "ast_hash": "fc3bf9bbb9c355f5f2b06a873fee5504",
+    "semantic_hash": "fc3bf9bbb9c355f5f2b06a873fee5504"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\tsconfig.json": {
+    "mtime": 1759601303.9334638,
+    "ast_hash": "967223fc5e18fdd91423cbb6c22bb322",
+    "semantic_hash": "967223fc5e18fdd91423cbb6c22bb322"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\README.md": {
+    "mtime": 1755103715.3266282,
+    "ast_hash": "410cf092be90a280be76705bcdfec74c",
+    "semantic_hash": "410cf092be90a280be76705bcdfec74c"
+  },
+  "C:\\Tomas\\UTN\\3er a\u00f1o\\Desarrollo\\Backend\\ts-setup-steps.md": {
+    "mtime": 1747342464.1620693,
+    "ast_hash": "d41a2281f7d5fd13d65aa4e09b3b15b6",
+    "semantic_hash": "d41a2281f7d5fd13d65aa4e09b3b15b6"
+  }
+}

@@ -15,7 +15,7 @@ uploads/
 Thumbs.db
 
 # ignore built ts files
-dist/**/*
+dist/
 
 # vscode
 .vscode/*
