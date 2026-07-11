@@ -1,9 +1,20 @@
 import { Router } from 'express';
-<<<<<<< Updated upstream
-import { sanitizeJugadorInput, findAll, findOne, findByEmail, getJugadoresSinEquipo, add, update, remove, register, login, forgotPassword, resetPassword,} from './jugador.controler.js';
-=======
-import { sanitizeJugadorInput, findAll, findOne, findByEmail, getJugadoresSinEquipo, findByAdmin, add, update, transferirCapitania, remove, register, login,} from './jugador.controler.js';
->>>>>>> Stashed changes
+import {
+  sanitizeJugadorInput,
+  findAll,
+  findOne,
+  findByEmail,
+  getJugadoresSinEquipo,
+  findByAdmin,
+  add,
+  update,
+  transferirCapitania,
+  remove,
+  register,
+  login,
+  forgotPassword,
+  resetPassword,
+} from './jugador.controler.js';
 
 export const jugadorRouter = Router();
 
