@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { orm } from '../shared/db/orm.js';
 import { Jugador } from './jugador.entity.js';
 import { Equipo } from '../equipo/equipo.entity.js';
+import { Torneo } from '../torneo/torneo.entity.js';
+import { Participacion } from '../participacion/participacion.entity.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
@@ -91,6 +93,44 @@ async function getJugadoresSinEquipo(req: Request, res: Response) {
   } catch (err) {
     console.error("❌ Error al obtener jugadores sin equipo:", err);
     res.status(500).json({ message: "Error al obtener jugadores sin equipo" });
+  }
+}
+
+/** 🔹 GET /jugadores/por-admin/:adminId — jugadores en equipos que participan
+ * en algún torneo del admin logueado (AdminTorneo → Torneo → Participacion → Equipo → Jugador) */
+async function findByAdmin(req: Request, res: Response) {
+  try {
+    const adminId = Number(req.params.adminId);
+    if (Number.isNaN(adminId)) return res.status(400).json({ message: 'adminId inválido' });
+
+    const torneos = await em.find(Torneo, { adminTorneo: adminId });
+    const torneoIds = torneos.map((t) => t.id).filter((id): id is number => id !== undefined);
+    if (torneoIds.length === 0) {
+      return res.status(200).json({ message: 'found jugadores por admin', data: [] });
+    }
+
+    const participaciones = await em.find(
+      Participacion,
+      { torneo: { $in: torneoIds } },
+      { populate: ['equipo'] }
+    );
+    const equipoIds = [
+      ...new Set(participaciones.map((p) => p.equipo.id).filter((id): id is number => id !== undefined)),
+    ];
+    if (equipoIds.length === 0) {
+      return res.status(200).json({ message: 'found jugadores por admin', data: [] });
+    }
+
+    const jugadores = await em.find(
+      Jugador,
+      { equipo: { $in: equipoIds } },
+      { populate: ['equipo'] }
+    );
+    const jugadoresSeguros = jugadores.map(({ contraseña, ...resto }) => resto);
+    res.status(200).json({ message: 'found jugadores por admin', data: jugadoresSeguros });
+  } catch (error: any) {
+    console.error('Error en findByAdmin:', error);
+    res.status(500).json({ message: error.message });
   }
 }
 
@@ -234,6 +274,51 @@ async function update(req: Request, res: Response) {
   } catch (error) {
     console.error('Error en update jugador:', error);
     res.status(500).json({ message: 'Error al actualizar jugador' });
+  }
+}
+
+/** 🔹 PATCH /jugadores/:id/transferir-capitania — el capitán (id) le pasa la cinta a otro jugador de su equipo */
+async function transferirCapitania(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    const idNuevoCapitan = Number(req.body.idNuevoCapitan);
+
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+    if (!req.body.idNuevoCapitan || Number.isNaN(idNuevoCapitan)) {
+      return res.status(400).json({ message: 'idNuevoCapitan es requerido' });
+    }
+
+    const result = await em.transactional(async (txEm) => {
+      const saliente = await txEm.findOneOrFail(Jugador, { id }, { populate: ['equipo'] });
+
+      if (!saliente.esCapitan || !saliente.equipo) {
+        throw Object.assign(new Error('Solo el capitán de un equipo puede transferir la capitanía'), { status: 403 });
+      }
+
+      const nuevoCapitan = await txEm.findOne(Jugador, { id: idNuevoCapitan }, { populate: ['equipo'] });
+      if (!nuevoCapitan) {
+        throw Object.assign(new Error('Jugador no encontrado'), { status: 404 });
+      }
+      if (nuevoCapitan.id === saliente.id) {
+        throw Object.assign(new Error('Elegí a otro jugador del equipo'), { status: 400 });
+      }
+      if (nuevoCapitan.equipo?.id !== saliente.equipo.id) {
+        throw Object.assign(new Error('El nuevo capitán debe pertenecer al mismo equipo'), { status: 400 });
+      }
+
+      saliente.esCapitan = false;
+      nuevoCapitan.esCapitan = true;
+
+      return { saliente, nuevoCapitan };
+    });
+
+    res.status(200).json({
+      message: 'Capitanía transferida correctamente',
+      data: { idSaliente: result.saliente.id, idNuevoCapitan: result.nuevoCapitan.id },
+    });
+  } catch (e: any) {
+    console.error('Error al transferir capitanía:', e);
+    res.status(e.status ?? 500).json({ message: e.message });
   }
 }
 
@@ -389,8 +474,10 @@ export {
   findOne,
   findByEmail,
   getJugadoresSinEquipo,
+  findByAdmin,
   add,
   update,
+  transferirCapitania,
   remove,
   register,
   login,
