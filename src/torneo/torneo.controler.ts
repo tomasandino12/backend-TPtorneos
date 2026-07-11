@@ -25,6 +25,11 @@ function sanitizeTorneoInput(req: Request, res: Response, next: NextFunction) {
     return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${categoriasValidas.join(', ')}` });
   }
 
+  const estadosValidos = ['borrador', 'inscripcion', 'en_curso', 'finalizado'];
+  if (req.body.sanitizedInput.estado && !estadosValidos.includes(req.body.sanitizedInput.estado)) {
+    return res.status(400).json({ message: `Estado inválido. Valores permitidos: ${estadosValidos.join(', ')}` });
+  }
+
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });

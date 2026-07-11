@@ -1,9 +1,10 @@
 import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Participacion } from '../participacion/participacion.entity.js';
-import { Arbitro } from '../arbitro/arbitro.entity.js';
-import { Cancha } from '../cancha/cancha.entity.js';
-import { Torneo } from '../torneo/torneo.entity.js';
+// import type + entidad como string — ver arbitro.entity.ts para el patrón.
+import type { Participacion } from '../participacion/participacion.entity.js';
+import type { Arbitro } from '../arbitro/arbitro.entity.js';
+import type { Cancha } from '../cancha/cancha.entity.js';
+import type { Torneo } from '../torneo/torneo.entity.js';
 
 
 @Entity()
@@ -27,19 +28,18 @@ export class Partido extends BaseEntity {
   @Property({ nullable: true })
   goles_visitante!: number;
 
-  @ManyToOne({entity: () => Torneo})
+  @ManyToOne('Torneo')
   torneo!: Torneo;
 
-  @ManyToOne(() => Cancha)
+  @ManyToOne('Cancha')
   cancha!: Cancha;
 
-  @ManyToOne(() => Arbitro)
+  @ManyToOne('Arbitro')
   arbitro!: Arbitro;
 
-  @ManyToOne(() => Participacion, { inversedBy: 'partidosLocal' })
+  @ManyToOne('Participacion', { inversedBy: 'partidosLocal' })
   local!: Participacion;
 
-  @ManyToOne(() => Participacion, { inversedBy: 'partidosVisitante' })
+  @ManyToOne('Participacion', { inversedBy: 'partidosVisitante' })
   visitante!: Participacion;
 }
-

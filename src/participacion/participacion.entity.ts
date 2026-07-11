@@ -1,25 +1,28 @@
 import { Entity, Property, ManyToOne, OneToMany, Collection, Unique } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Equipo, Torneo, Partido } from '../shared/db/entities.js';
-import e from 'express';
+// import type + entidad como string en todas — ver arbitro.entity.ts para
+// la explicación completa del ciclo que esto evita.
+import type { Equipo } from '../equipo/equipo.entity.js';
+import type { Torneo } from '../torneo/torneo.entity.js';
+import type { Partido } from '../partido/partido.entity.js';
 
 @Entity()
 @Unique({ properties: ['torneo', 'equipo'] })
 export class Participacion extends BaseEntity {
 
-  @ManyToOne(() => Equipo)
+  @ManyToOne('Equipo')
   equipo!: Equipo;
 
-  @ManyToOne(() => Torneo)
+  @ManyToOne('Torneo')
   torneo!: Torneo;
 
   @Property()
   fecha_inscripcion!: Date;
 
-  @OneToMany(() => Partido, partido => partido.local)
+  @OneToMany('Partido', 'local')
   partidosLocal = new Collection<Partido>(this);
 
-  @OneToMany(() => Partido, partido => partido.visitante)
+  @OneToMany('Partido', 'visitante')
   partidosVisitante = new Collection<Partido>(this);
 
 }

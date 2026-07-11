@@ -1,6 +1,8 @@
 import { Entity, PrimaryKey, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Equipo } from '../shared/db/entities.js';
+// import type + entidad como string en el decorador — ver arbitro.entity.ts
+// para la explicación completa del ciclo que esto evita.
+import type { Equipo } from '../equipo/equipo.entity.js';
 
 @Entity()
 export class Jugador extends BaseEntity {
@@ -31,7 +33,7 @@ export class Jugador extends BaseEntity {
   @Property({ default: false })
   esCapitan!: boolean;
 
-  @ManyToOne(() => Equipo, { nullable: true })
+  @ManyToOne('Equipo', { nullable: true })
   equipo!: Equipo | null;
 
   @Property({ nullable: true })

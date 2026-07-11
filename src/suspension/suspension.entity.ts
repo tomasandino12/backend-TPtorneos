@@ -1,15 +1,16 @@
 import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../shared/db/baseEntity.entity.js';
-import { Jugador } from '../jugador/jugador.entity.js';
-import { Torneo } from '../torneo/torneo.entity.js';
+// import type + entidad como string — ver arbitro.entity.ts para el patrón.
+import type { Jugador } from '../jugador/jugador.entity.js';
+import type { Torneo } from '../torneo/torneo.entity.js';
 
 @Entity()
 export class Suspension extends BaseEntity {
 
-  @ManyToOne(() => Jugador)
+  @ManyToOne('Jugador')
   jugador!: Jugador;
 
-  @ManyToOne(() => Torneo)
+  @ManyToOne('Torneo')
   torneo!: Torneo;
 
   @Property()

@@ -16,7 +16,7 @@ Content-Type: application/json
   "nombreTorneo": "Torneo mayores Calusura 2025",
   "fechaInicio": "2025-07-01",
   "fechaFin": "2025-12-05",
-  "estado": "activo",
+  "estado": "borrador",
   "adminTorneo": 3
 }
 
@@ -29,7 +29,7 @@ Content-Type: application/json
   "nombre": "Torneo Apertura 2025 - Actualizado",
   "fechaInicio": "2025-03-10",
   "fechaFin": "2025-07-20",
-  "estado": "en progreso",
+  "estado": "en_curso",
   "adminTorneo": 3
 }
 
