@@ -4,19 +4,30 @@ import { Cancha } from './cancha.entity.js';
 
 const em = orm.em;
 
+const ESTADOS_VALIDOS = ['activa', 'mantenimiento', 'inactiva'];
+
 /** Sanitiza y normaliza el body */
-function sanitizeCanchaInput(req: Request, _res: Response, next: NextFunction) {
+function sanitizeCanchaInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombre: req.body.nombre,
     direccion: req.body.direccion,
     tipoSuperficie: req.body.tipoSuperficie,
     capacidad: req.body.capacidad !== undefined ? Number(req.body.capacidad) : undefined,
+    estado: req.body.estado,
+    precioPorHora: req.body.precioPorHora !== undefined ? Number(req.body.precioPorHora) : undefined,
+    iluminacion: req.body.iluminacion !== undefined ? Boolean(req.body.iluminacion) : undefined,
   };
 
   // elimina keys undefined
   Object.keys(req.body.sanitizedInput).forEach((k) => {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
+
+  if (req.body.sanitizedInput.estado && !ESTADOS_VALIDOS.includes(req.body.sanitizedInput.estado)) {
+    return res.status(400).json({
+      message: `Estado inválido. Valores permitidos: ${ESTADOS_VALIDOS.join(', ')}`,
+    });
+  }
 
   next();
 }

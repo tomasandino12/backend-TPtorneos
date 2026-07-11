@@ -17,6 +17,16 @@ export class Cancha extends BaseEntity {
   @Property({nullable:false})
   capacidad!: number;
 
+  // 'activa' | 'mantenimiento' | 'inactiva'
+  @Property({ nullable: false, default: 'activa' })
+  estado!: string;
+
+  @Property({ nullable: false, default: 0 })
+  precioPorHora!: number;
+
+  @Property({ nullable: false, default: false })
+  iluminacion!: boolean;
+
   @OneToMany(() => Partido, partido => partido.cancha)
   partidos = new Collection<Partido>(this);
 }
