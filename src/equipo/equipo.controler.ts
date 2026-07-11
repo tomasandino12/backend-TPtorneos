@@ -6,6 +6,7 @@ import { Equipo } from './equipo.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';
 import { Partido } from '../partido/partido.entity.js';
+import { Suspension } from '../suspension/suspension.entity.js';
 
 const em = orm.em;
 
@@ -92,7 +93,24 @@ async function findOne(req: Request, res: Response) {
 
     if (!equipo) return res.status(404).json({ message: "equipo not found" });
 
-    res.status(200).json({ message: "found equipo", data: equipo });
+    // Enriquecer cada jugador con si tiene una suspensión activa (en cualquier
+    // torneo — esta pantalla muestra el plantel completo, sin distinguir torneo).
+    const jugadorIds = equipo.jugadores
+      .getItems()
+      .map((j) => j.id)
+      .filter((jid): jid is number => jid !== undefined);
+
+    const suspensionesActivas = jugadorIds.length > 0
+      ? await em.find(Suspension, { jugador: { $in: jugadorIds }, activa: true })
+      : [];
+    const idsSuspendidos = new Set(suspensionesActivas.map((s) => (s.jugador as any).id));
+
+    const equipoConSuspensiones = {
+      ...equipo,
+      jugadores: equipo.jugadores.getItems().map((j) => ({ ...j, suspendido: idsSuspendidos.has(j.id) })),
+    };
+
+    res.status(200).json({ message: "found equipo", data: equipoConSuspensiones });
   } catch (e: any) {
     console.error("Error en findOne:", e);
     res.status(500).json({ message: e.message });

@@ -3,6 +3,8 @@ import { orm } from '../shared/db/orm.js';
 import { Torneo } from './torneo.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';
 import { Partido } from '../partido/partido.entity.js';
+import { TorneoArbitro } from '../torneoArbitro/torneoArbitro.entity.js';
+import { TorneoCancha } from '../torneoCancha/torneoCancha.entity.js';
 
 const em = orm.em;
 
@@ -98,6 +100,74 @@ async function remove(req: Request, res: Response) {
   }
 }
 
+/** 🔹 GET /torneo/:id/arbitros — árbitros asignados a este torneo */
+async function getArbitros(req: Request, res: Response) {
+  try {
+    const torneoId = Number(req.params.id);
+    if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
+
+    const asociaciones = await em.find(TorneoArbitro, { torneo: torneoId }, { populate: ['arbitro'] });
+    res.status(200).json({ message: 'found arbitros del torneo', data: asociaciones.map((a) => a.arbitro) });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
+/** 🔹 PUT /torneo/:id/arbitros — body { arbitroIds }, reemplaza el set completo */
+async function setArbitros(req: Request, res: Response) {
+  try {
+    const torneoId = Number(req.params.id);
+    if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
+
+    const torneo = await em.findOne(Torneo, { id: torneoId });
+    if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const arbitroIds: number[] = Array.isArray(req.body.arbitroIds) ? req.body.arbitroIds : [];
+
+    await em.nativeDelete(TorneoArbitro, { torneo: torneoId });
+    const nuevas = arbitroIds.map((arbitroId) => em.create(TorneoArbitro, { torneo: torneoId, arbitro: Number(arbitroId) }));
+    await em.persistAndFlush(nuevas);
+
+    res.status(200).json({ message: 'Árbitros del torneo actualizados', data: nuevas });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
+/** 🔹 GET /torneo/:id/canchas — canchas asignadas a este torneo */
+async function getCanchas(req: Request, res: Response) {
+  try {
+    const torneoId = Number(req.params.id);
+    if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
+
+    const asociaciones = await em.find(TorneoCancha, { torneo: torneoId }, { populate: ['cancha'] });
+    res.status(200).json({ message: 'found canchas del torneo', data: asociaciones.map((c) => c.cancha) });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
+/** 🔹 PUT /torneo/:id/canchas — body { canchaIds }, reemplaza el set completo */
+async function setCanchas(req: Request, res: Response) {
+  try {
+    const torneoId = Number(req.params.id);
+    if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
+
+    const torneo = await em.findOne(Torneo, { id: torneoId });
+    if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const canchaIds: number[] = Array.isArray(req.body.canchaIds) ? req.body.canchaIds : [];
+
+    await em.nativeDelete(TorneoCancha, { torneo: torneoId });
+    const nuevas = canchaIds.map((canchaId) => em.create(TorneoCancha, { torneo: torneoId, cancha: Number(canchaId) }));
+    await em.persistAndFlush(nuevas);
+
+    res.status(200).json({ message: 'Canchas del torneo actualizadas', data: nuevas });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
 // Genera pares round-robin. Retorna un array de jornadas, cada jornada es un array de pares [local, visitante].
 function generarRondas(participaciones: Participacion[], formato: string): [Participacion, Participacion][][] {
   const teams = [...participaciones];
@@ -151,10 +221,21 @@ async function generarFixture(req: Request, res: Response) {
       return res.status(409).json({ message: 'El torneo ya tiene un fixture generado' });
     }
 
-    const { canchaIds, arbitroIds, fechaBase, horaBase, diasEntreJornadas = 7 } = req.body;
+    const { fechaBase, horaBase, diasEntreJornadas = 7 } = req.body;
 
-    if (!canchaIds?.length || !arbitroIds?.length || !fechaBase || !horaBase) {
-      return res.status(400).json({ message: 'Campos requeridos: canchaIds (array), arbitroIds (array), fechaBase, horaBase' });
+    if (!fechaBase || !horaBase) {
+      return res.status(400).json({ message: 'Campos requeridos: fechaBase, horaBase' });
+    }
+
+    const torneoArbitros = await em.find(TorneoArbitro, { torneo: torneoId }, { populate: ['arbitro'] });
+    const torneoCanchas = await em.find(TorneoCancha, { torneo: torneoId }, { populate: ['cancha'] });
+    const arbitroIds = torneoArbitros.map((ta) => ta.arbitro.id).filter((aid): aid is number => aid !== undefined);
+    const canchaIds = torneoCanchas.map((tc) => tc.cancha.id).filter((cid): cid is number => cid !== undefined);
+
+    if (!arbitroIds.length || !canchaIds.length) {
+      return res.status(400).json({
+        message: 'Asigná al menos un árbitro y una cancha al torneo antes de generar el fixture (pestañas Árbitros y Canchas)',
+      });
     }
 
     const rondas = generarRondas(participaciones, torneo.formato);
@@ -200,4 +281,16 @@ async function generarFixture(req: Request, res: Response) {
   }
 }
 
-export { sanitizeTorneoInput, findAll, findOne, add, update, remove, generarFixture };
+export {
+  sanitizeTorneoInput,
+  findAll,
+  findOne,
+  add,
+  update,
+  remove,
+  getArbitros,
+  setArbitros,
+  getCanchas,
+  setCanchas,
+  generarFixture,
+};

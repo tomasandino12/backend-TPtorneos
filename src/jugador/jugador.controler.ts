@@ -5,6 +5,8 @@ import { Jugador } from './jugador.entity.js';
 import { Equipo } from '../equipo/equipo.entity.js';
 import { Torneo } from '../torneo/torneo.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';
+import { Suspension } from '../suspension/suspension.entity.js';
+import { Notificacion } from '../notificacion/notificacion.entity.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
@@ -322,6 +324,144 @@ async function transferirCapitania(req: Request, res: Response) {
   }
 }
 
+/** Resuelve la Participacion del torneo 'en_curso' del equipo de un jugador
+ * (un equipo solo puede estar en un torneo en_curso a la vez — validado en
+ * POST /participacion — así que como mucho hay una). */
+async function resolverParticipacionActiva(jugador: Jugador) {
+  if (!jugador.equipo) return null;
+  return em.findOne(
+    Participacion,
+    { equipo: jugador.equipo.id, torneo: { estado: 'en_curso' } },
+    { populate: ['torneo', 'torneo.adminTorneo'] }
+  );
+}
+
+/** 🔹 PATCH /jugadores/:id/suspender — body { motivo } */
+async function suspender(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const motivo = String(req.body.motivo ?? '').trim();
+    if (!motivo) return res.status(400).json({ message: 'El motivo es requerido' });
+
+    const jugador = await em.findOne(Jugador, { id }, { populate: ['equipo'] });
+    if (!jugador) return res.status(404).json({ message: 'Jugador no encontrado' });
+
+    const participacion = await resolverParticipacionActiva(jugador);
+    if (!participacion) {
+      return res.status(400).json({ message: 'El equipo del jugador no participa en ningún torneo activo' });
+    }
+    const torneo = participacion.torneo;
+
+    if ((torneo as any).adminTorneo?.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No autorizado para suspender jugadores de este torneo' });
+    }
+
+    const yaSuspendido = await em.findOne(Suspension, { jugador: id, torneo: torneo.id, activa: true });
+    if (yaSuspendido) {
+      return res.status(409).json({ message: 'El jugador ya está suspendido en este torneo' });
+    }
+
+    const suspension = em.create(Suspension, {
+      jugador,
+      torneo,
+      motivo,
+      fecha: new Date(),
+      activa: true,
+    });
+
+    const notificacion = em.create(Notificacion, {
+      jugador,
+      tipo: 'suspension',
+      mensaje: `Fuiste suspendido del torneo "${torneo.nombreTorneo}". Motivo: ${motivo}`,
+      torneo,
+      leida: false,
+      fecha: new Date(),
+    });
+
+    await em.persistAndFlush([suspension, notificacion]);
+    res.status(201).json({ message: 'Jugador suspendido', data: suspension });
+  } catch (error: any) {
+    console.error('Error al suspender jugador:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** 🔹 PATCH /jugadores/:id/habilitar — body { idSuspension } */
+async function habilitar(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    const idSuspension = Number(req.body.idSuspension);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+    if (!req.body.idSuspension || Number.isNaN(idSuspension)) {
+      return res.status(400).json({ message: 'idSuspension es requerido' });
+    }
+
+    const suspension = await em.findOne(
+      Suspension,
+      { id: idSuspension, jugador: id },
+      { populate: ['jugador', 'torneo', 'torneo.adminTorneo'] }
+    );
+    if (!suspension) return res.status(404).json({ message: 'Suspensión no encontrada' });
+    if (!suspension.activa) return res.status(400).json({ message: 'La suspensión ya fue levantada' });
+
+    if ((suspension.torneo as any).adminTorneo?.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No autorizado para levantar esta suspensión' });
+    }
+
+    suspension.activa = false;
+    suspension.fechaLevantamiento = new Date();
+
+    const notificacion = em.create(Notificacion, {
+      jugador: suspension.jugador,
+      tipo: 'habilitacion',
+      mensaje: `Se levantó tu suspensión en el torneo "${suspension.torneo.nombreTorneo}".`,
+      torneo: suspension.torneo,
+      leida: false,
+      fecha: new Date(),
+    });
+
+    await em.persistAndFlush(notificacion);
+    res.status(200).json({ message: 'Suspensión levantada', data: suspension });
+  } catch (error: any) {
+    console.error('Error al habilitar jugador:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** 🔹 GET /jugadores/:id/suspensiones — historial + torneo activo actual */
+async function suspensiones(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const jugador = await em.findOne(Jugador, { id }, { populate: ['equipo'] });
+    if (!jugador) return res.status(404).json({ message: 'Jugador no encontrado' });
+
+    const historial = await em.find(
+      Suspension,
+      { jugador: id },
+      { populate: ['torneo'], orderBy: { fecha: 'DESC' } }
+    );
+
+    const participacionActiva = await resolverParticipacionActiva(jugador);
+
+    res.status(200).json({
+      message: 'found suspensiones',
+      data: {
+        suspensiones: historial,
+        torneoActivo: participacionActiva
+          ? { id: participacionActiva.torneo.id, nombreTorneo: participacionActiva.torneo.nombreTorneo }
+          : null,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error en suspensiones:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
 /** 🔹 DELETE /jugadores/:id */
 async function remove(req: Request, res: Response) {
   try {
@@ -478,6 +618,9 @@ export {
   add,
   update,
   transferirCapitania,
+  suspender,
+  habilitar,
+  suspensiones,
   remove,
   register,
   login,

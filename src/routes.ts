@@ -8,6 +8,7 @@ import { adminTorneoRouter } from './adminTorneo/adminTorneo.routes.js';
 import { torneoRouter } from './torneo/torneo.routes.js';
 import { participacionRouter } from './participacion/participacion.routes.js';
 import { invitacionRouter } from './invitacion/invitacion.routes.js';
+import { notificacionRouter } from './notificacion/notificacion.routes.js';
 
 export const apiRouter = Router();
 
