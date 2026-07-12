@@ -9,6 +9,7 @@ import { torneoRouter } from './torneo/torneo.routes.js';
 import { participacionRouter } from './participacion/participacion.routes.js';
 import { invitacionRouter } from './invitacion/invitacion.routes.js';
 import { notificacionRouter } from './notificacion/notificacion.routes.js';
+import { formacionRouter } from './formacion/formacion.routes.js';
 
 export const apiRouter = Router();
 
@@ -22,5 +23,7 @@ apiRouter.use('/adminTorneo', adminTorneoRouter);
 apiRouter.use('/torneo', torneoRouter);
 apiRouter.use('/participacion', participacionRouter);
 apiRouter.use('/invitaciones', invitacionRouter);
+apiRouter.use('/notificaciones', notificacionRouter);
+apiRouter.use('/formaciones', formacionRouter);
 
 

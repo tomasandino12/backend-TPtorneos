@@ -9,6 +9,7 @@ import {
   add,
   update,
   transferirCapitania,
+  expulsar,
   suspender,
   habilitar,
   suspensiones,
@@ -35,6 +36,7 @@ jugadorRouter.post('/forgot-password', forgotPassword);
 jugadorRouter.post('/reset-password', resetPassword);
 jugadorRouter.post('/', sanitizeJugadorInput, add);
 jugadorRouter.patch('/:id/transferir-capitania', transferirCapitania);
+jugadorRouter.patch('/:id/expulsar', expulsar);
 jugadorRouter.patch('/:id/suspender', suspender);
 jugadorRouter.patch('/:id/habilitar', habilitar);
 jugadorRouter.put('/:id', sanitizeJugadorInput, update);

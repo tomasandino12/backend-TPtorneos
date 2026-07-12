@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { findByJugador, marcarLeida } from './notificacion.controler.js';
+import { misNotificaciones, marcarLeida } from './notificacion.controler.js';
 
 export const notificacionRouter = Router();
 
-notificacionRouter.get('/jugador/:idJugador', findByJugador);
+notificacionRouter.get('/', misNotificaciones);
 notificacionRouter.patch('/:id/leida', marcarLeida);

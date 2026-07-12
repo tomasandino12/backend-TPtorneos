@@ -38,3 +38,63 @@ Content-Type: application/json
 ### Eliminar un jugador
 DELETE http://localhost:3000/api/jugadores/8
 Content-Type: application/json
+
+
+### =========================================================
+### PATCH /jugadores/:id/expulsar — pegar un token real obtenido
+### de POST /jugadores/login (el del capitán) antes de probar.
+### =========================================================
+
+@tokenCapitan = PEGAR_TOKEN_DEL_CAPITAN_ACA
+@tokenCapitanOtroEquipo = PEGAR_TOKEN_DE_UN_CAPITAN_DE_OTRO_EQUIPO_ACA
+@tokenNoCapitan = PEGAR_TOKEN_DE_UN_JUGADOR_NO_CAPITAN_ACA
+@tokenCapitanId = 1
+
+### Caso exitoso: el capitán expulsa a un jugador de su propio equipo
+PATCH http://localhost:3000/api/jugadores/6/expulsar
+Content-Type: application/json
+Authorization: Bearer {{tokenCapitan}}
+
+{
+  "motivo": "No se presentó a los últimos 3 partidos"
+}
+
+
+### Error 403: quien llama es capitán, pero de OTRO equipo (no el del jugador objetivo)
+PATCH http://localhost:3000/api/jugadores/6/expulsar
+Content-Type: application/json
+Authorization: Bearer {{tokenCapitanOtroEquipo}}
+
+{
+  "motivo": "No se presentó a los últimos 3 partidos"
+}
+
+
+### Error 403: quien llama no es capitán de ningún equipo
+PATCH http://localhost:3000/api/jugadores/6/expulsar
+Content-Type: application/json
+Authorization: Bearer {{tokenNoCapitan}}
+
+{
+  "motivo": "No se presentó a los últimos 3 partidos"
+}
+
+
+### Error 400: el capitán intenta expulsarse a sí mismo (:id === id del capitán autenticado)
+PATCH http://localhost:3000/api/jugadores/{{tokenCapitanId}}/expulsar
+Content-Type: application/json
+Authorization: Bearer {{tokenCapitan}}
+
+{
+  "motivo": "Prueba de auto-expulsión"
+}
+
+
+### Error 400: motivo vacío / demasiado corto
+PATCH http://localhost:3000/api/jugadores/6/expulsar
+Content-Type: application/json
+Authorization: Bearer {{tokenCapitan}}
+
+{
+  "motivo": "  "
+}

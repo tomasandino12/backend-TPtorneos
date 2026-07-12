@@ -4,15 +4,13 @@ import { Notificacion } from './notificacion.entity.js';
 
 const em = orm.em;
 
-/** 🔹 GET /notificacion/jugador/:idJugador — notificaciones no leídas */
-async function findByJugador(req: Request, res: Response) {
+/** 🔹 GET /notificaciones — todas las notificaciones (cualquier tipo, leídas y no
+ * leídas) del jugador autenticado (req.user), ordenadas por fecha descendente. */
+async function misNotificaciones(req: Request, res: Response) {
   try {
-    const idJugador = Number(req.params.idJugador);
-    if (Number.isNaN(idJugador)) return res.status(400).json({ message: 'idJugador inválido' });
-
     const notificaciones = await em.find(
       Notificacion,
-      { jugador: idJugador, leida: false },
+      { jugador: req.user?.id },
       { populate: ['torneo'], orderBy: { fecha: 'DESC' } }
     );
 
@@ -22,14 +20,17 @@ async function findByJugador(req: Request, res: Response) {
   }
 }
 
-/** 🔹 PATCH /notificacion/:id/leida */
+/** 🔹 PATCH /notificaciones/:id/leida — solo el dueño de la notificación (req.user) puede marcarla */
 async function marcarLeida(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const notificacion = await em.findOne(Notificacion, { id });
+    const notificacion = await em.findOne(Notificacion, { id }, { populate: ['jugador'] });
     if (!notificacion) return res.status(404).json({ message: 'Notificación no encontrada' });
+    if (notificacion.jugador.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No podés marcar como leída la notificación de otro jugador' });
+    }
 
     notificacion.leida = true;
     await em.flush();
@@ -40,4 +41,4 @@ async function marcarLeida(req: Request, res: Response) {
   }
 }
 
-export { findByJugador, marcarLeida };
+export { misNotificaciones, marcarLeida };

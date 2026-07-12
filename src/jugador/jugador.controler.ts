@@ -324,6 +324,71 @@ async function transferirCapitania(req: Request, res: Response) {
   }
 }
 
+/** 🔹 PATCH /jugadores/:id/expulsar — el capitán autenticado (req.user) echa a
+ * un jugador (:id) de su propio equipo. Body: { motivo }.
+ * A diferencia de PUT /jugadores/:id (equipo: null), acá se valida server-side
+ * que quien llama sea capitán del equipo del jugador objetivo y se exige motivo. */
+async function expulsar(req: Request, res: Response) {
+  try {
+    const idObjetivo = Number(req.params.id);
+    if (Number.isNaN(idObjetivo)) return res.status(400).json({ message: 'id inválido' });
+
+    const motivo = String(req.body.motivo ?? '').trim();
+
+    const result = await em.transactional(async (txEm) => {
+      const capitan = await txEm.findOne(Jugador, { id: req.user?.id }, { populate: ['equipo'] });
+      if (!capitan || !capitan.esCapitan || !capitan.equipo) {
+        throw Object.assign(new Error('Solo el capitán de un equipo puede expulsar jugadores'), { status: 403 });
+      }
+
+      const jugadorObjetivo = await txEm.findOne(Jugador, { id: idObjetivo }, { populate: ['equipo'] });
+      if (!jugadorObjetivo) {
+        throw Object.assign(new Error('Jugador no encontrado'), { status: 404 });
+      }
+
+      if (jugadorObjetivo.equipo?.id !== capitan.equipo.id) {
+        throw Object.assign(new Error('No sos capitán del equipo de este jugador'), { status: 403 });
+      }
+
+      if (jugadorObjetivo.id === capitan.id) {
+        throw Object.assign(new Error(
+          'No podés expulsarte a vos mismo con esta acción. Usá "Transferir capitanía" y luego "Salir del equipo".'
+        ), { status: 400 });
+      }
+
+      if (!motivo || motivo.length < 5) {
+        throw Object.assign(new Error('El motivo es requerido (mínimo 5 caracteres)'), { status: 400 });
+      }
+
+      const equipo = capitan.equipo;
+      jugadorObjetivo.equipo = null;
+
+      const notificacion = txEm.create(Notificacion, {
+        jugador: jugadorObjetivo,
+        tipo: 'expulsion',
+        mensaje: `Fuiste expulsado del equipo "${equipo.nombreEquipo}". Motivo: ${motivo}`,
+        leida: false,
+        fecha: new Date(),
+      });
+      txEm.persist(notificacion);
+
+      return { jugadorObjetivo, equipo, motivo };
+    });
+
+    res.status(200).json({
+      message: 'Jugador expulsado del equipo',
+      data: {
+        idJugador: result.jugadorObjetivo.id,
+        idEquipo: result.equipo.id,
+        motivo: result.motivo,
+      },
+    });
+  } catch (e: any) {
+    console.error('Error al expulsar jugador:', e);
+    res.status(e.status ?? 500).json({ message: e.message });
+  }
+}
+
 /** Resuelve la Participacion del torneo 'en_curso' del equipo de un jugador
  * (un equipo solo puede estar en un torneo en_curso a la vez — validado en
  * POST /participacion — así que como mucho hay una). */
@@ -618,6 +683,7 @@ export {
   add,
   update,
   transferirCapitania,
+  expulsar,
   suspender,
   habilitar,
   suspensiones,

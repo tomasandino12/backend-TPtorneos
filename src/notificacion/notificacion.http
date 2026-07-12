@@ -1,0 +1,22 @@
+### =========================================================
+### GET/PATCH /notificaciones — pegar un token real (login) antes de probar.
+### =========================================================
+
+@token = PEGAR_TOKEN_ACA
+
+### Todas mis notificaciones (cualquier tipo, leídas y no leídas, más recientes primero)
+GET http://localhost:3000/api/notificaciones
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+### Marcar una notificación propia como leída
+PATCH http://localhost:3000/api/notificaciones/1/leida
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+### Error 403: intentar marcar como leída una notificación de otro jugador
+PATCH http://localhost:3000/api/notificaciones/999/leida
+Content-Type: application/json
+Authorization: Bearer {{token}}
