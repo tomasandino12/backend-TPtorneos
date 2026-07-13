@@ -137,7 +137,7 @@ async function getPartidosPorTorneo(req: Request, res: Response) {
       Partido,
       { torneo: torneoId },
       {
-        populate: ["local.equipo", "visitante.equipo", "cancha", "torneo"],
+        populate: ["local.equipo", "visitante.equipo", "cancha", "torneo", "arbitro"],
         orderBy: { fecha_partido: "ASC" },
       }
     );

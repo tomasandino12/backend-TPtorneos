@@ -18,7 +18,6 @@ function sanitizeEquipoInput(req: Request, res: Response, next: NextFunction) {
     colorSecundario: req.body.colorSecundario,
     categoria: req.body.categoria,
     descripcion: req.body.descripcion,
-    idJugador: req.body.idJugador,
   };
 
   Object.keys(req.body.sanitizedInput).forEach((k) => {
@@ -118,23 +117,25 @@ async function findOne(req: Request, res: Response) {
 }
 
 
-/** 🔹 POST /equipos */
+/** 🔹 POST /equipos — quien crea el equipo queda como su capitán inicial
+ * (resuelto siempre por req.user, nunca por un idJugador que mande el body). */
 async function add(req: Request, res: Response) {
   try {
-    const { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion, idJugador } = req.body.sanitizedInput;
+    const { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion } = req.body.sanitizedInput;
 
     const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion });
     await em.persistAndFlush(nuevoEquipo);
 
-    
-    const jugador = await em.findOne(Jugador, { id: idJugador });
-    if (jugador) {
-      if (jugador.equipo) {
-        return res.status(400).json({ message: 'El jugador ya pertenece a un equipo' });
+    if (req.user?.rol !== 'admin') {
+      const jugador = await em.findOne(Jugador, { id: req.user?.id });
+      if (jugador) {
+        if (jugador.equipo) {
+          return res.status(400).json({ message: 'El jugador ya pertenece a un equipo' });
+        }
+        jugador.equipo = nuevoEquipo;
+        jugador.esCapitan = true;
+        await em.flush();
       }
-      jugador.equipo = nuevoEquipo;
-      jugador.esCapitan = true;
-      await em.flush();
     }
 
     res.status(201).json({ message: 'equipo created', data: nuevoEquipo });
@@ -215,6 +216,14 @@ async function remove(req: Request, res: Response) {
 
     const equipo = await em.findOne(Equipo, { id });
     if (!equipo) return res.status(404).json({ message: 'equipo not found' });
+
+    if (req.user?.rol !== 'admin') {
+      const jugadorAutenticado = await em.findOne(Jugador, { id: req.user?.id }, { populate: ['equipo'] });
+      const esCapitanDeEsteEquipo = jugadorAutenticado?.esCapitan && jugadorAutenticado.equipo?.id === id;
+      if (!esCapitanDeEsteEquipo) {
+        return res.status(403).json({ message: 'Solo el capitán del equipo puede eliminarlo' });
+      }
+    }
 
     await em.removeAndFlush(equipo);
     res.status(204).end();

@@ -8,6 +8,20 @@ import { TorneoCancha } from '../torneoCancha/torneoCancha.entity.js';
 
 const em = orm.em;
 
+/** Devuelve un { status, message } si el admin autenticado (req.user) no es el
+ * dueño de este torneo, o null si puede operar sobre él. JWT-driven: nunca
+ * confía en un dato de la URL/body para decidir "quién sos" — mismo patrón
+ * que expulsar()/formaciones (ver docs/backend/glosario.md). */
+function verificarAdminDueño(torneo: Torneo, req: Request): { status: number; message: string } | null {
+  if (req.user?.rol !== 'admin') {
+    return { status: 403, message: 'Solo un administrador de torneo puede realizar esta acción' };
+  }
+  if (torneo.adminTorneo?.id !== req.user?.id) {
+    return { status: 403, message: 'No sos el administrador dueño de este torneo' };
+  }
+  return null;
+}
+
 function sanitizeTorneoInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
     nombreTorneo: req.body.nombreTorneo,
@@ -60,9 +74,15 @@ async function findOne(req: Request, res: Response) {
   }
 }
 
+/** 🔹 POST /torneo — el admin autenticado crea el torneo a su propio nombre
+ * (adminTorneo se resuelve siempre de req.user, nunca del body). */
 async function add(req: Request, res: Response) {
   try {
-    const data = { ...req.body.sanitizedInput };
+    if (req.user?.rol !== 'admin') {
+      return res.status(403).json({ message: 'Solo un administrador de torneo puede crear torneos' });
+    }
+
+    const data = { ...req.body.sanitizedInput, adminTorneo: req.user.id };
     const torneo = em.create(Torneo, data);
     await em.persistAndFlush(torneo);
 
@@ -77,8 +97,11 @@ async function update(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const torneoToUpdate = await em.findOne(Torneo, { id });
+    const torneoToUpdate = await em.findOne(Torneo, { id }, { populate: ['adminTorneo'] });
     if (!torneoToUpdate) return res.status(404).json({ message: 'torneo not found' });
+
+    const errorAuth = verificarAdminDueño(torneoToUpdate, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     const data = { ...req.body.sanitizedInput };
     em.assign(torneoToUpdate, data);
@@ -95,8 +118,11 @@ async function remove(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const torneo = await em.findOne(Torneo, { id });
+    const torneo = await em.findOne(Torneo, { id }, { populate: ['adminTorneo'] });
     if (!torneo) return res.status(404).json({ message: 'torneo not found' });
+
+    const errorAuth = verificarAdminDueño(torneo, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     await em.removeAndFlush(torneo);
     res.status(204).end();
@@ -124,8 +150,11 @@ async function setArbitros(req: Request, res: Response) {
     const torneoId = Number(req.params.id);
     if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
 
-    const torneo = await em.findOne(Torneo, { id: torneoId });
+    const torneo = await em.findOne(Torneo, { id: torneoId }, { populate: ['adminTorneo'] });
     if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const errorAuth = verificarAdminDueño(torneo, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     const arbitroIds: number[] = Array.isArray(req.body.arbitroIds) ? req.body.arbitroIds : [];
 
@@ -158,8 +187,11 @@ async function setCanchas(req: Request, res: Response) {
     const torneoId = Number(req.params.id);
     if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
 
-    const torneo = await em.findOne(Torneo, { id: torneoId });
+    const torneo = await em.findOne(Torneo, { id: torneoId }, { populate: ['adminTorneo'] });
     if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const errorAuth = verificarAdminDueño(torneo, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     const canchaIds: number[] = Array.isArray(req.body.canchaIds) ? req.body.canchaIds : [];
 
@@ -213,8 +245,11 @@ async function generarFixture(req: Request, res: Response) {
     const torneoId = Number(req.params.id);
     if (Number.isNaN(torneoId)) return res.status(400).json({ message: 'id inválido' });
 
-    const torneo = await em.findOne(Torneo, { id: torneoId }, { populate: ['participaciones'] });
+    const torneo = await em.findOne(Torneo, { id: torneoId }, { populate: ['participaciones', 'adminTorneo'] });
     if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const errorAuth = verificarAdminDueño(torneo, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     const participaciones = torneo.participaciones.getItems();
     if (participaciones.length < 2) {

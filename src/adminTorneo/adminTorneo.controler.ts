@@ -167,25 +167,4 @@ async function login(req: Request, res: Response) {
   }
 }
 
-/** GET /adminTorneo/fix-passwords — uso único para hashear contraseñas en texto plano */
-async function fixPasswords(_req: Request, res: Response) {
-  try {
-    const admins = await em.find(AdminTorneo, {});
-    let actualizados = 0;
-
-    for (const admin of admins) {
-      if (!admin.contraseña.startsWith('$2')) {
-        admin.contraseña = await bcrypt.hash(admin.contraseña, 10);
-        actualizados++;
-      }
-    }
-
-    await em.flush();
-    res.json({ message: `Contraseñas hasheadas: ${actualizados} de ${admins.length}` });
-  } catch (error: any) {
-    console.error('[fix-passwords] Error:', error);
-    res.status(500).json({ message: error.message });
-  }
-}
-
-export { sanitizeAdminTorneoInput, findAll, findOne, add, update, remove, login, fixPasswords };
+export { sanitizeAdminTorneoInput, findAll, findOne, add, update, remove, login };

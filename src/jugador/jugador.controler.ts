@@ -168,6 +168,11 @@ async function add(req: Request, res: Response) {
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
+
+    if (req.user?.id !== id) {
+      return res.status(403).json({ message: 'Solo podés editar tu propio perfil' });
+    }
+
     const {
       nombre,
       apellido,
@@ -293,6 +298,9 @@ async function transferirCapitania(req: Request, res: Response) {
     const result = await em.transactional(async (txEm) => {
       const saliente = await txEm.findOneOrFail(Jugador, { id }, { populate: ['equipo'] });
 
+      if (saliente.id !== req.user?.id) {
+        throw Object.assign(new Error('Solo el propio capitán puede transferir su capitanía'), { status: 403 });
+      }
       if (!saliente.esCapitan || !saliente.equipo) {
         throw Object.assign(new Error('Solo el capitán de un equipo puede transferir la capitanía'), { status: 403 });
       }
@@ -533,6 +541,10 @@ async function remove(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (Number.isNaN(id))
       return res.status(400).json({ message: 'id inválido' });
+
+    if (req.user?.id !== id) {
+      return res.status(403).json({ message: 'Solo podés eliminar tu propio perfil' });
+    }
 
     const ref = em.getReference(Jugador, id);
     await em.removeAndFlush(ref);

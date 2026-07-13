@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Invitacion } from './invitacion.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
+import { Notificacion } from '../notificacion/notificacion.entity.js';
 
 const em = orm.em;
 
@@ -75,7 +76,15 @@ async function add(req: Request, res: Response) {
       vistaPorCapitan: false,
     });
 
-    await em.persistAndFlush(invitacion);
+    const notificacion = em.create(Notificacion, {
+      jugador: jugadorInvitado,
+      tipo: 'invitacion_recibida',
+      mensaje: `Te invitaron a unirte al equipo "${capitanEmisor.equipo.nombreEquipo}".`,
+      leida: false,
+      fecha: new Date(),
+    });
+
+    await em.persistAndFlush([invitacion, notificacion]);
     res.status(201).json({ message: 'invitacion created', data: invitacion });
   } catch (e: any) {
     console.error('Error al crear invitación:', e);
@@ -151,7 +160,7 @@ async function responder(req: Request, res: Response) {
     const { estado } = req.body.sanitizedInput;
 
     const result = await em.transactional(async (txEm) => {
-      const invitacion = await txEm.findOneOrFail(Invitacion, { id }, { populate: ['jugador', 'equipo'] });
+      const invitacion = await txEm.findOneOrFail(Invitacion, { id }, { populate: ['jugador', 'equipo', 'capitanEmisor'] });
 
       if (invitacion.jugador.id !== req.user?.id) {
         throw Object.assign(new Error('No autorizado para responder esta invitación'), { status: 403 });
@@ -181,6 +190,16 @@ async function responder(req: Request, res: Response) {
       invitacion.estado = estado;
       invitacion.fechaRespuesta = new Date();
       invitacion.vistaPorCapitan = false;
+
+      txEm.create(Notificacion, {
+        jugador: invitacion.capitanEmisor,
+        tipo: estado === 'aceptada' ? 'invitacion_aceptada' : 'invitacion_rechazada',
+        mensaje: estado === 'aceptada'
+          ? `${invitacion.jugador.nombre} ${invitacion.jugador.apellido} aceptó tu invitación y se sumó a "${invitacion.equipo.nombreEquipo}".`
+          : `${invitacion.jugador.nombre} ${invitacion.jugador.apellido} rechazó tu invitación a "${invitacion.equipo.nombreEquipo}".`,
+        leida: false,
+        fecha: new Date(),
+      });
 
       return invitacion;
     });
