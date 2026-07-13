@@ -576,6 +576,7 @@ async function login(req: Request, res: Response) {
         id: jugador.id,
         nombre: jugador.nombre,
         email: jugador.email,
+        rol: jugador.esCapitan ? 'capitan' : 'jugador',
       },
       process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024',
       { expiresIn: '2h' }
