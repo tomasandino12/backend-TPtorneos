@@ -14,7 +14,7 @@ export class Formacion extends BaseEntity {
   @Property()
   esquema!: string;
 
-  @Property({ nullable: true })
+  @Property({ type: 'text', nullable: true })
   notas?: string;
 
   @Property()
