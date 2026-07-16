@@ -1,12 +1,22 @@
+import 'dotenv/config';
 import { MikroORM } from '@mikro-orm/core';
 import { SqlHighlighter } from '@mikro-orm/sql-highlighter';
+
+// import 'dotenv/config' repetido acá (además de app.ts) a propósito: cualquier
+// entry point que importe este módulo (ej. scripts/seed.ts, que no carga dotenv)
+// necesita tener process.env poblado antes del MikroORM.init() de más abajo.
+const DB_HOST = process.env.DB_HOST || 'localhost';
+const DB_PORT = process.env.DB_PORT || '3306';
+const DB_USER = process.env.DB_USER || 'dsw';
+const DB_PASSWORD = process.env.DB_PASSWORD || 'dsw';
+const DB_NAME = process.env.DB_NAME || 'gestordetorneos';
 
 export const orm = await MikroORM.init({
   entities: ['dist/**/*.entity.js'],
   entitiesTs: ['src/**/*.entity.ts'],
-  dbName: 'gestordetorneos',
+  dbName: DB_NAME,
   type: 'mysql',
-  clientUrl: 'mysql://dsw:dsw@localhost:3306/gestordetorneos',
+  clientUrl: `mysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`,
   highlighter: new SqlHighlighter(),
   debug: true,
   schemaGenerator: {            // ⚠️ solo en dev
