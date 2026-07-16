@@ -9,9 +9,11 @@ import { Suspension } from '../suspension/suspension.entity.js';
 import { Notificacion } from '../notificacion/notificacion.entity.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
 
 const em = orm.em;
+const googleClient = new OAuth2Client();
 
 /** 🔹 Sanitiza y normaliza el body */
 function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
@@ -147,6 +149,9 @@ async function add(req: Request, res: Response) {
 
     const existente = await em.findOne(Jugador, { email: data.email });
     if (existente) return res.status(409).json({ error: 'Ya existe un jugador con ese email' });
+
+    const dniEnUso = await em.findOne(Jugador, { dni: data.dni });
+    if (dniEnUso) return res.status(400).json({ error: 'Ya existe una cuenta registrada con ese DNI.' });
 
     if (data.contraseña) {
       data.contraseña = await bcrypt.hash(data.contraseña, 10);
@@ -588,6 +593,94 @@ async function login(req: Request, res: Response) {
   }
 }
 
+/** 🔹 POST /jugadores/google-login — body { credential, dni?, fechaNacimiento?, posicion? }.
+ * `credential` es el id_token que devuelve el botón "Continuar con Google" del
+ * frontend. Si el email ya tiene cuenta, loguea (igual que login()). Si no,
+ * crea el jugador — para eso hacen falta dni/fechaNacimiento/posicion, que
+ * Google no provee, así que el frontend los tiene que pedir en un paso corto
+ * después del botón de Google y mandarlos en el mismo request. */
+async function googleLogin(req: Request, res: Response) {
+  const { credential, dni, fechaNacimiento, posicion } = req.body;
+
+  if (!credential) {
+    return res.status(400).json({ message: 'credential es requerido' });
+  }
+
+  try {
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch (verifyError) {
+      console.error('Error al verificar token de Google:', verifyError);
+      return res.status(401).json({ message: 'Token de Google inválido' });
+    }
+
+    const email = payload?.email;
+    if (!email) {
+      return res.status(401).json({ message: 'Token de Google inválido' });
+    }
+
+    const jugadorExistente = await em.findOne(Jugador, { email });
+
+    if (jugadorExistente) {
+      const token = jwt.sign(
+        { id: jugadorExistente.id, nombre: jugadorExistente.nombre, email: jugadorExistente.email },
+        process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024',
+        { expiresIn: '2h' }
+      );
+      return res.json({ token });
+    }
+
+    if (!dni || !fechaNacimiento || !posicion) {
+      return res.status(400).json({ message: 'Faltan dni, fechaNacimiento y posicion para completar el registro' });
+    }
+
+    // No hay constraint único de dni a nivel de base (ver docs/backend/pendientes.md) —
+    // sin este chequeo, dos jugadores con emails distintos podrían compartir el mismo dni sin ningún error.
+    const dniEnUso = await em.findOne(Jugador, { dni });
+    if (dniEnUso) {
+      return res.status(400).json({
+        message: 'Ya existe una cuenta con ese DNI. Iniciá sesión con tu método original o contactá soporte.',
+      });
+    }
+
+    // Contraseña real no existe en este flujo: se genera una al azar, hasheada,
+    // que nunca se le muestra al jugador — no sirve para loguearse con contraseña,
+    // solo queda para que la columna (NOT NULL) tenga un valor válido.
+    const contraseñaAleatoria = crypto.randomBytes(32).toString('hex');
+    const hash = await bcrypt.hash(contraseñaAleatoria, 10);
+
+    const nuevoJugador = em.create(Jugador, {
+      nombre: payload?.given_name ?? '',
+      apellido: payload?.family_name ?? '',
+      dni,
+      email,
+      fechaNacimiento,
+      contraseña: hash,
+      posicion,
+      equipo: null,
+      esCapitan: false,
+    });
+
+    await em.persistAndFlush(nuevoJugador);
+
+    const token = jwt.sign(
+      { id: nuevoJugador.id },
+      process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024',
+      { expiresIn: '2h' }
+    );
+
+    res.status(201).json({ token, id: nuevoJugador.id });
+  } catch (error: any) {
+    console.error('Error en google-login:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
+  }
+}
+
 /** 🔹 POST /jugadores/registro */
 async function register(req: Request, res: Response) {
   try {
@@ -599,6 +692,10 @@ async function register(req: Request, res: Response) {
     const existeJugador = await em.findOne(Jugador, { email: datos.email });
     if (existeJugador)
       return res.status(409).json({ message: "Ya existe un jugador con ese email" });
+
+    const dniEnUso = await em.findOne(Jugador, { dni: datos.dni });
+    if (dniEnUso)
+      return res.status(400).json({ message: "Ya existe una cuenta registrada con ese DNI." });
 
     const hash = await bcrypt.hash(datos.contraseña, 10);
 
@@ -702,6 +799,7 @@ export {
   remove,
   register,
   login,
+  googleLogin,
   forgotPassword,
   resetPassword,
 };

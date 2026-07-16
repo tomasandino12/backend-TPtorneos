@@ -12,6 +12,7 @@ declare global {
 // Rutas que no requieren token. req.path llega sin el prefijo /api.
 const PUBLIC_PATHS: { method: string; path: string }[] = [
   { method: 'POST', path: '/jugadores/login' },
+  { method: 'POST', path: '/jugadores/google-login' },
   { method: 'POST', path: '/jugadores/registro' },
   { method: 'POST', path: '/jugadores/forgot-password' },
   { method: 'POST', path: '/jugadores/reset-password' },

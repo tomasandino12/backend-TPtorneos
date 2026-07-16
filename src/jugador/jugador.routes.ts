@@ -16,6 +16,7 @@ import {
   remove,
   register,
   login,
+  googleLogin,
   forgotPassword,
   resetPassword,
 } from './jugador.controler.js';
@@ -31,6 +32,7 @@ jugadorRouter.get('/:id', findOne);
 
 
 jugadorRouter.post('/login', login);
+jugadorRouter.post('/google-login', googleLogin);
 jugadorRouter.post('/registro', sanitizeJugadorInput, register);
 jugadorRouter.post('/forgot-password', forgotPassword);
 jugadorRouter.post('/reset-password', resetPassword);
