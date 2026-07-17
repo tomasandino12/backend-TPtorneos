@@ -10,6 +10,26 @@ import { Suspension } from '../suspension/suspension.entity.js';
 
 const em = orm.em;
 
+/** Devuelve un { status, message } si quien llama (req.user) no puede operar
+ * sobre este equipo (no es admin ni es su capitán), o null si puede — mismo
+ * patrón que verificarAdminDueño en torneo.controler.ts. Recibe el
+ * EntityManager como parámetro porque uploadEscudo() usa uno forkeado propio,
+ * distinto del `em` global que usan el resto de las funciones de este archivo. */
+async function verificarCapitanDueño(
+  equipoId: number,
+  req: Request,
+  emInstance: typeof em
+): Promise<{ status: number; message: string } | null> {
+  if (req.user?.rol === 'admin') return null;
+
+  const jugadorAutenticado = await emInstance.findOne(Jugador, { id: req.user?.id }, { populate: ['equipo'] });
+  const esCapitanDeEsteEquipo = jugadorAutenticado?.esCapitan && jugadorAutenticado.equipo?.id === equipoId;
+  if (!esCapitanDeEsteEquipo) {
+    return { status: 403, message: 'Solo el capitán del equipo puede realizar esta acción' };
+  }
+  return null;
+}
+
 /** 🔹 Sanitiza el body */
 function sanitizeEquipoInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
@@ -123,25 +143,36 @@ async function add(req: Request, res: Response) {
   try {
     const { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion } = req.body.sanitizedInput;
 
-    const nuevoEquipo = em.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion });
-    await em.persistAndFlush(nuevoEquipo);
-
-    if (req.user?.rol !== 'admin') {
-      const jugador = await em.findOne(Jugador, { id: req.user?.id });
-      if (jugador) {
-        if (jugador.equipo) {
-          return res.status(400).json({ message: 'El jugador ya pertenece a un equipo' });
+    // Toda la escritura en una transacción: si la validación de "el jugador ya
+    // tiene equipo" falla, el rollback evita que quede un Equipo huérfano
+    // (sin capitán ni jugadores) persistido en la base.
+    const nuevoEquipo = await em.transactional(async (txEm) => {
+      if (req.user?.rol !== 'admin') {
+        const jugador = await txEm.findOne(Jugador, { id: req.user?.id });
+        if (jugador?.equipo) {
+          throw Object.assign(new Error('El jugador ya pertenece a un equipo'), { status: 400 });
         }
-        jugador.equipo = nuevoEquipo;
-        jugador.esCapitan = true;
-        await em.flush();
+
+        const equipo = txEm.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion });
+        txEm.persist(equipo);
+
+        if (jugador) {
+          jugador.equipo = equipo;
+          jugador.esCapitan = true;
+        }
+
+        return equipo;
       }
-    }
+
+      const equipo = txEm.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion });
+      txEm.persist(equipo);
+      return equipo;
+    });
 
     res.status(201).json({ message: 'equipo created', data: nuevoEquipo });
   } catch (e: any) {
     console.error('Error al crear equipo:', e);
-    res.status(500).json({ message: e.message });
+    res.status(e.status ?? 500).json({ message: e.message });
   }
 }
 
@@ -154,13 +185,8 @@ async function update(req: Request, res: Response) {
     const equipoToUpdate = await em.findOne(Equipo, { id });
     if (!equipoToUpdate) return res.status(404).json({ message: 'equipo not found' });
 
-    if (req.user?.rol !== 'admin') {
-      const jugadorAutenticado = await em.findOne(Jugador, { id: req.user?.id }, { populate: ['equipo'] });
-      const esCapitanDeEsteEquipo = jugadorAutenticado?.esCapitan && jugadorAutenticado.equipo?.id === id;
-      if (!esCapitanDeEsteEquipo) {
-        return res.status(403).json({ message: 'Solo el capitán del equipo puede editarlo' });
-      }
-    }
+    const errorAuth = await verificarCapitanDueño(id, req, em);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     em.assign(equipoToUpdate, req.body.sanitizedInput);
     await em.flush();
@@ -184,13 +210,8 @@ async function uploadEscudo(req: Request, res: Response) {
     const equipo = await em.findOne(Equipo, { id });
     if (!equipo) return res.status(404).json({ message: 'equipo not found' });
 
-    if (req.user?.rol !== 'admin') {
-      const jugadorAutenticado = await em.findOne(Jugador, { id: req.user?.id }, { populate: ['equipo'] });
-      const esCapitanDeEsteEquipo = jugadorAutenticado?.esCapitan && jugadorAutenticado.equipo?.id === id;
-      if (!esCapitanDeEsteEquipo) {
-        return res.status(403).json({ message: 'Solo el capitán del equipo puede editarlo' });
-      }
-    }
+    const errorAuth = await verificarCapitanDueño(id, req, em);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     if (!req.file) return res.status(400).json({ message: 'Falta el archivo del escudo (.jpg)' });
 
@@ -217,13 +238,8 @@ async function remove(req: Request, res: Response) {
     const equipo = await em.findOne(Equipo, { id });
     if (!equipo) return res.status(404).json({ message: 'equipo not found' });
 
-    if (req.user?.rol !== 'admin') {
-      const jugadorAutenticado = await em.findOne(Jugador, { id: req.user?.id }, { populate: ['equipo'] });
-      const esCapitanDeEsteEquipo = jugadorAutenticado?.esCapitan && jugadorAutenticado.equipo?.id === id;
-      if (!esCapitanDeEsteEquipo) {
-        return res.status(403).json({ message: 'Solo el capitán del equipo puede eliminarlo' });
-      }
-    }
+    const errorAuth = await verificarCapitanDueño(id, req, em);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     await em.removeAndFlush(equipo);
     res.status(204).end();

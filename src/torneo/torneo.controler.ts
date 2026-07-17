@@ -5,6 +5,8 @@ import { Participacion } from '../participacion/participacion.entity.js';
 import { Partido } from '../partido/partido.entity.js';
 import { TorneoArbitro } from '../torneoArbitro/torneoArbitro.entity.js';
 import { TorneoCancha } from '../torneoCancha/torneoCancha.entity.js';
+import { Arbitro } from '../arbitro/arbitro.entity.js';
+import { Cancha } from '../cancha/cancha.entity.js';
 
 const em = orm.em;
 
@@ -158,6 +160,13 @@ async function setArbitros(req: Request, res: Response) {
 
     const arbitroIds: number[] = Array.isArray(req.body.arbitroIds) ? req.body.arbitroIds : [];
 
+    if (arbitroIds.length > 0) {
+      const encontrados = await em.count(Arbitro, { id: { $in: arbitroIds } });
+      if (encontrados !== new Set(arbitroIds).size) {
+        return res.status(400).json({ message: 'Uno o más árbitros no existen' });
+      }
+    }
+
     await em.nativeDelete(TorneoArbitro, { torneo: torneoId });
     const nuevas = arbitroIds.map((arbitroId) => em.create(TorneoArbitro, { torneo: torneoId, arbitro: Number(arbitroId) }));
     await em.persistAndFlush(nuevas);
@@ -194,6 +203,13 @@ async function setCanchas(req: Request, res: Response) {
     if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     const canchaIds: number[] = Array.isArray(req.body.canchaIds) ? req.body.canchaIds : [];
+
+    if (canchaIds.length > 0) {
+      const encontradas = await em.count(Cancha, { id: { $in: canchaIds } });
+      if (encontradas !== new Set(canchaIds).size) {
+        return res.status(400).json({ message: 'Una o más canchas no existen' });
+      }
+    }
 
     await em.nativeDelete(TorneoCancha, { torneo: torneoId });
     const nuevas = canchaIds.map((canchaId) => em.create(TorneoCancha, { torneo: torneoId, cancha: Number(canchaId) }));
@@ -333,4 +349,5 @@ export {
   getCanchas,
   setCanchas,
   generarFixture,
+  generarRondas,
 };

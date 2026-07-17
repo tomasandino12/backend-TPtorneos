@@ -6,6 +6,7 @@
     "moduleResolution": "bundler",
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -15,5 +16,5 @@
     "experimentalDecorators": true
   },
   "include": ["src/**/*", "**/*.ts", "src/**/*.ts" ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "vitest.config.ts", "vitest.setup.ts", "src/**/*.test.ts"]
 }

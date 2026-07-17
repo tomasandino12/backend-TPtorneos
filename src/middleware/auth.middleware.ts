@@ -1,10 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+/** Forma del payload que se firma en jugador.controler.ts (login/googleLogin)
+ * y adminTorneo.controler.ts (login). `rol` es opcional porque el JWT de
+ * googleLogin para un jugador recién registrado no lo incluye (ver
+ * jugador.controler.ts googleLogin). */
+export interface AuthPayload {
+  id: number;
+  nombre?: string;
+  email?: string;
+  rol?: 'admin' | 'capitan' | 'jugador';
+}
+
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user?: AuthPayload;
     }
   }
 }
@@ -27,15 +38,15 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No autorizado' });
+    return res.status(401).json({ message: 'No autorizado' });
   }
 
   const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024');
-    req.user = payload;
+    req.user = payload as AuthPayload;
     next();
   } catch {
-    res.status(401).json({ error: 'No autorizado' });
+    res.status(401).json({ message: 'No autorizado' });
   }
 }

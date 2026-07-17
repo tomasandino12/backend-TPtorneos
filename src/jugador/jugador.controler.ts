@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
+import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
 
 const em = orm.em;
 const googleClient = new OAuth2Client();
@@ -144,14 +145,14 @@ async function add(req: Request, res: Response) {
     const data = req.body.sanitizedInput;
 
     if (!data.nombre || !data.apellido || !data.dni || !data.email || !data.contraseña) {
-      return res.status(400).json({ error: 'Faltan campos requeridos: nombre, apellido, dni, email, contraseña' });
+      return res.status(400).json({ message: 'Faltan campos requeridos: nombre, apellido, dni, email, contraseña' });
     }
 
     const existente = await em.findOne(Jugador, { email: data.email });
-    if (existente) return res.status(409).json({ error: 'Ya existe un jugador con ese email' });
+    if (existente) return res.status(409).json({ message: 'Ya existe un jugador con ese email' });
 
     const dniEnUso = await em.findOne(Jugador, { dni: data.dni });
-    if (dniEnUso) return res.status(400).json({ error: 'Ya existe una cuenta registrada con ese DNI.' });
+    if (dniEnUso) return res.status(400).json({ message: 'Ya existe una cuenta registrada con ese DNI.' });
 
     if (data.contraseña) {
       data.contraseña = await bcrypt.hash(data.contraseña, 10);
@@ -159,6 +160,26 @@ async function add(req: Request, res: Response) {
 
     data.esCapitan = data.esCapitan ?? false;
     data.equipo = data.equipo ?? null;
+
+    // Igual que en update()/invitacion.controler.ts: si se asigna un equipo acá
+    // (fuera del flujo normal de invitación) hay que respetar las mismas reglas
+    // de negocio — cupo máximo de plantel y capitán único — para no dejar
+    // colarse un segundo capitán o un plantel sin límite por este otro camino.
+    if (data.equipo) {
+      const cantidadJugadores = await em.count(Jugador, { equipo: Number(data.equipo) });
+      if (cantidadJugadores >= MAX_JUGADORES_PLANTEL) {
+        return res.status(400).json({
+          message: `El plantel ya alcanzó el límite de ${MAX_JUGADORES_PLANTEL} jugadores`,
+        });
+      }
+
+      if (data.esCapitan === true) {
+        const capitanExistente = await em.findOne(Jugador, { equipo: Number(data.equipo), esCapitan: true });
+        if (capitanExistente) {
+          return res.status(400).json({ message: 'El equipo ya tiene un capitán' });
+        }
+      }
+    }
 
     const jugador = em.create(Jugador, data);
     await em.flush();
@@ -209,7 +230,7 @@ async function update(req: Request, res: Response) {
       const targetEquipoId = equipo ? Number(equipo) : jugador.equipo?.id;
       if (targetEquipoId) {
         const capitan = await em.findOne(Jugador, { equipo: targetEquipoId, esCapitan: true, id: { $ne: id } });
-        if (capitan) return res.status(400).json({ error: 'El equipo ya tiene un capitán' });
+        if (capitan) return res.status(400).json({ message: 'El equipo ya tiene un capitán' });
       }
     }
 
@@ -266,6 +287,10 @@ async function update(req: Request, res: Response) {
 
         const equipoEntidad = await txEm.findOneOrFail(Equipo, { id: Number(equipo) });
         j.equipo = equipoEntidad;
+        // Al entrar a un equipo nuevo nunca hereda la capitanía del anterior —
+        // si corresponde, el body puede volver a pedir esCapitan:true explícito
+        // más abajo, y ahí sí pasa por la validación de capitán único de arriba.
+        j.esCapitan = false;
       }
 
       if (nombre) j.nombre = nombre;
@@ -432,7 +457,7 @@ async function suspender(req: Request, res: Response) {
     }
     const torneo = participacion.torneo;
 
-    if ((torneo as any).adminTorneo?.id !== req.user?.id) {
+    if (req.user?.rol !== 'admin' || torneo.adminTorneo?.id !== req.user?.id) {
       return res.status(403).json({ message: 'No autorizado para suspender jugadores de este torneo' });
     }
 
@@ -484,7 +509,7 @@ async function habilitar(req: Request, res: Response) {
     if (!suspension) return res.status(404).json({ message: 'Suspensión no encontrada' });
     if (!suspension.activa) return res.status(400).json({ message: 'La suspensión ya fue levantada' });
 
-    if ((suspension.torneo as any).adminTorneo?.id !== req.user?.id) {
+    if (req.user?.rol !== 'admin' || suspension.torneo.adminTorneo?.id !== req.user?.id) {
       return res.status(403).json({ message: 'No autorizado para levantar esta suspensión' });
     }
 
@@ -629,7 +654,12 @@ async function googleLogin(req: Request, res: Response) {
 
     if (jugadorExistente) {
       const token = jwt.sign(
-        { id: jugadorExistente.id, nombre: jugadorExistente.nombre, email: jugadorExistente.email },
+        {
+          id: jugadorExistente.id,
+          nombre: jugadorExistente.nombre,
+          email: jugadorExistente.email,
+          rol: jugadorExistente.esCapitan ? 'capitan' : 'jugador',
+        },
         process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024',
         { expiresIn: '2h' }
       );
@@ -670,7 +700,7 @@ async function googleLogin(req: Request, res: Response) {
     await em.persistAndFlush(nuevoJugador);
 
     const token = jwt.sign(
-      { id: nuevoJugador.id },
+      { id: nuevoJugador.id, nombre: nuevoJugador.nombre, email: nuevoJugador.email, rol: 'jugador' },
       process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024',
       { expiresIn: '2h' }
     );

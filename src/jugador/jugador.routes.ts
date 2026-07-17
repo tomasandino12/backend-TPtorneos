@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRole } from '../middleware/role.middleware.js';
 import {
   sanitizeJugadorInput,
   findAll,
@@ -39,8 +40,8 @@ jugadorRouter.post('/reset-password', resetPassword);
 jugadorRouter.post('/', sanitizeJugadorInput, add);
 jugadorRouter.patch('/:id/transferir-capitania', transferirCapitania);
 jugadorRouter.patch('/:id/expulsar', expulsar);
-jugadorRouter.patch('/:id/suspender', suspender);
-jugadorRouter.patch('/:id/habilitar', habilitar);
+jugadorRouter.patch('/:id/suspender', requireRole('admin'), suspender);
+jugadorRouter.patch('/:id/habilitar', requireRole('admin'), habilitar);
 jugadorRouter.put('/:id', sanitizeJugadorInput, update);
 jugadorRouter.patch('/:id', sanitizeJugadorInput, update);
 jugadorRouter.delete('/:id', remove);

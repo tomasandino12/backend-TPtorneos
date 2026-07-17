@@ -3,11 +3,11 @@ import { orm } from '../shared/db/orm.js';
 import { Invitacion } from './invitacion.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
 import { Notificacion } from '../notificacion/notificacion.entity.js';
+import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
 
 const em = orm.em;
 
 const ESTADOS_VALIDOS = ['pendiente', 'aceptada', 'rechazada'];
-const MAX_JUGADORES_PLANTEL = 26;
 
 /** 🔹 Sanitiza el body para crear una invitación */
 function sanitizeInvitacionInput(req: Request, res: Response, next: NextFunction) {

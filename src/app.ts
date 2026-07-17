@@ -8,7 +8,7 @@ import { orm, syncSchema } from './shared/db/orm.js';
 import { apiRouter } from './routes.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
 
-const app = express();
+export const app = express();
 
 app.use(cors());
 
@@ -31,11 +31,16 @@ app.use((_, res) => {
   res.status(404).send({ message: 'Resource not found' });
 });
 
-// Sincronizar schema (solo en desarrollo)
+// Sincronizar schema (solo en desarrollo/test — ver docs/backend/glosario.md)
 await syncSchema();
 
-// Inicialización del servidor
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000/');
-});
+// Los tests de integración (Vitest fija NODE_ENV=test automáticamente)
+// importan `app` y le pegan con supertest directamente, sin bindear un
+// puerto real — evita pisar el server de desarrollo que puede estar
+// corriendo en el 3000 al mismo tiempo.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(3000, () => {
+    console.log('Server running on http://localhost:3000/');
+  });
+}
 
