@@ -11,12 +11,21 @@ const DB_USER = process.env.DB_USER || 'dsw';
 const DB_PASSWORD = process.env.DB_PASSWORD || 'dsw';
 const DB_NAME = process.env.DB_NAME || 'gestordetorneos';
 
+// DB_SSL=true habilita TLS en la conexión (necesario para MySQL en la nube,
+// ej. Aiven, que exige ssl-mode=REQUIRED) — rejectUnauthorized:false cifra la
+// conexión sin validar el certificado del servidor contra una CA local.
+// En desarrollo local (sin DB_SSL o en 'false') no se agrega, igual que antes.
+const DB_SSL = process.env.DB_SSL === 'true';
+
 export const orm = await MikroORM.init({
   entities: ['dist/**/*.entity.js'],
   entitiesTs: ['src/**/*.entity.ts'],
   dbName: DB_NAME,
   type: 'mysql',
   clientUrl: `mysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`,
+  driverOptions: DB_SSL
+    ? { connection: { ssl: { rejectUnauthorized: false } } }
+    : {},
   highlighter: new SqlHighlighter(),
   debug: true,
   schemaGenerator: {            // ⚠️ solo en dev
