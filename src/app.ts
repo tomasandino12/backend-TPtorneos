@@ -39,8 +39,9 @@ await syncSchema();
 // puerto real — evita pisar el server de desarrollo que puede estar
 // corriendo en el 3000 al mismo tiempo.
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(3000, () => {
-    console.log('Server running on http://localhost:3000/');
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
