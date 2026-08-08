@@ -11,6 +11,8 @@ import {
   getCanchas,
   setCanchas,
   generarFixture,
+  previewFechaFin,
+  extenderFechaFin,
 } from './torneo.controler.js';
 import { requireRole } from '../middleware/role.middleware.js';
 
@@ -21,6 +23,8 @@ torneoRouter.get('/:id/arbitros', getArbitros);
 torneoRouter.put('/:id/arbitros', requireRole('admin'), setArbitros);
 torneoRouter.get('/:id/canchas', getCanchas);
 torneoRouter.put('/:id/canchas', requireRole('admin'), setCanchas);
+torneoRouter.post('/:id/fecha-fin/preview', requireRole('admin'), previewFechaFin);
+torneoRouter.patch('/:id/fecha-fin', requireRole('admin'), extenderFechaFin);
 torneoRouter.get('/:id', findOne);
 torneoRouter.post('/', requireRole('admin'), sanitizeTorneoInput, add);
 torneoRouter.post('/:id/generar-fixture', requireRole('admin'), generarFixture);

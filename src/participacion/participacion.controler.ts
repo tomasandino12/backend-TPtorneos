@@ -6,6 +6,35 @@ import { Torneo } from '../torneo/torneo.entity.js';
 
 const em = orm.em;
 
+/** Formatea una fecha como DD/MM/AAAA para mensajes de error legibles. */
+function formatFecha(fecha: Date): string {
+  const d = new Date(fecha);
+  const dia = String(d.getDate()).padStart(2, '0');
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dia}/${mes}/${d.getFullYear()}`;
+}
+
+/** Dos torneos se superponen si el inicio de cada uno cae antes (o el mismo
+ * día) que el fin del otro. Fórmula estándar de solapamiento de rangos. */
+function seSuperponen(a: { fechaInicio: Date; fechaFin: Date }, b: { fechaInicio: Date; fechaFin: Date }): boolean {
+  return a.fechaInicio <= b.fechaFin && b.fechaInicio <= a.fechaFin;
+}
+
+/** Regla 3 (misma fórmula que torneo.controler.ts): duración mínima = 7 días
+ * × cantidad REAL de equipos. `cantidadEquiposReal` tiene que ser el conteo
+ * de participaciones en el momento de la validación (acá, +1 por el equipo
+ * que se está por agregar y todavía no está persistido) — nunca
+ * `Torneo.cantidadEquipos`, que es solo el cupo máximo declarado. */
+function validarDuracionMinima(fechaInicio: Date, fechaFin: Date, cantidadEquiposReal: number): string | null {
+  const MS_POR_DIA = 24 * 60 * 60 * 1000;
+  const dias = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / MS_POR_DIA);
+  const minimoRequerido = 7 * cantidadEquiposReal;
+  if (dias < minimoRequerido) {
+    return `La duración del torneo (${dias} día(s)) es menor a la mínima requerida: 7 días × ${cantidadEquiposReal} equipos = ${minimoRequerido} día(s).`;
+  }
+  return null;
+}
+
 // 🔹 Middleware para sanitizar input
 function sanitizeParticipacionInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
@@ -85,6 +114,31 @@ async function add(req: Request, res: Response) {
       return res.status(409).json({
         message: `El equipo ya está participando en el torneo activo "${(participacionActiva.torneo as any).nombreTorneo}"`,
       });
+    }
+
+    // Validación 3: el equipo no puede estar inscripto en otro torneo cuyas
+    // fechas se superpongan con las de este (sin importar el estado de ese
+    // otro torneo — a diferencia de la validación 2, que solo mira "en_curso").
+    const participacionesDelEquipo = await em.find(
+      Participacion,
+      { equipo: equipoId, torneo: { $ne: torneoId } },
+      { populate: ['torneo'] }
+    );
+    const conflicto = participacionesDelEquipo.find((p) => seSuperponen(p.torneo, torneo));
+    if (conflicto) {
+      const otroTorneo = conflicto.torneo as any;
+      return res.status(409).json({
+        message: `El equipo ya está inscripto en "${otroTorneo.nombreTorneo}", que finaliza el ${formatFecha(otroTorneo.fechaFin)}, y sus fechas se superponen con las de este torneo (inicia el ${formatFecha(torneo.fechaInicio)}).`,
+      });
+    }
+
+    // Validación 4 (Regla 3): la duración fija del torneo (fechaInicio/fechaFin
+    // no cambian acá) tiene que alcanzar para 7 días × cada equipo ya inscripto
+    // MÁS este que se está por agregar (+1, porque todavía no está persistido).
+    const equiposActuales = await em.count(Participacion, { torneo: torneoId });
+    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, torneo.fechaFin, equiposActuales + 1);
+    if (errorDuracion) {
+      return res.status(400).json({ message: errorDuracion });
     }
 
     const participacion = em.create(Participacion, req.body.sanitizedInput);

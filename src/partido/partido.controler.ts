@@ -126,6 +126,46 @@ async function findProgramados(_req: Request, res: Response) {
   }
 }
 
+/** 🔹 PATCH /partidos/:id/resultado — carga el resultado de un partido.
+ * Solo el admin dueño del torneo puede hacerlo, y solo mientras el torneo
+ * está "en_curso" (no tiene sentido cargar resultados de un torneo que
+ * todavía no arrancó o que ya cerró). goles_local/goles_visitante tienen que
+ * ser enteros >= 0. Marca el partido como 'jugado'. */
+async function actualizarResultado(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const partido = await em.findOne(Partido, { id }, { populate: ['torneo.adminTorneo'] });
+    if (!partido) return res.status(404).json({ message: 'Partido no encontrado' });
+
+    if (req.user?.rol !== 'admin' || partido.torneo.adminTorneo?.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No sos el administrador dueño de este torneo' });
+    }
+
+    if (partido.torneo.estado !== 'en_curso') {
+      return res.status(400).json({ message: 'Solo se puede cargar el resultado de un partido de un torneo en curso' });
+    }
+
+    const golesLocal = Number(req.body.goles_local);
+    const golesVisitante = Number(req.body.goles_visitante);
+    const esEnteroNoNegativo = (v: number) => Number.isInteger(v) && v >= 0;
+
+    if (!esEnteroNoNegativo(golesLocal) || !esEnteroNoNegativo(golesVisitante)) {
+      return res.status(400).json({ message: 'goles_local y goles_visitante deben ser números enteros no negativos' });
+    }
+
+    partido.goles_local = golesLocal;
+    partido.goles_visitante = golesVisitante;
+    partido.estado_partido = 'jugado';
+    await em.flush();
+
+    res.status(200).json({ message: 'Resultado cargado', data: partido });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
 async function getPartidosPorTorneo(req: Request, res: Response) {
   try {
     const torneoId = Number(req.params.id);
@@ -156,6 +196,6 @@ async function getPartidosPorTorneo(req: Request, res: Response) {
 
 
 
-export { sanitizePartidoInput, findAll, findOne, add, update, remove, findProgramados,  getPartidosPorTorneo};
+export { sanitizePartidoInput, findAll, findOne, add, update, remove, findProgramados, getPartidosPorTorneo, actualizarResultado };
 
 

@@ -7,6 +7,8 @@ import { TorneoArbitro } from '../torneoArbitro/torneoArbitro.entity.js';
 import { TorneoCancha } from '../torneoCancha/torneoCancha.entity.js';
 import { Arbitro } from '../arbitro/arbitro.entity.js';
 import { Cancha } from '../cancha/cancha.entity.js';
+import { Notificacion } from '../notificacion/notificacion.entity.js';
+import { Suspension } from '../suspension/suspension.entity.js';
 
 const em = orm.em;
 
@@ -22,6 +24,86 @@ function verificarAdminDueño(torneo: Torneo, req: Request): { status: number; m
     return { status: 403, message: 'No sos el administrador dueño de este torneo' };
   }
   return null;
+}
+
+/** Regla 3: duración mínima = 7 días × cantidad de equipos. IMPORTANTE: el
+ * tercer parámetro tiene que ser el conteo REAL de equipos a validar en ese
+ * momento (participaciones.length, +1 si se está por agregar uno nuevo que
+ * todavía no está persistido) — nunca `Torneo.cantidadEquipos`, que es solo
+ * el cupo máximo declarado y puede desincronizarse de la realidad (llegó a
+ * quedar en 0 con 12 equipos ya inscriptos). Devuelve un mensaje de error si
+ * no se cumple, o null si la duración es válida. */
+function validarDuracionMinima(fechaInicio: Date, fechaFin: Date, cantidadEquiposReal: number): string | null {
+  const MS_POR_DIA = 24 * 60 * 60 * 1000;
+  const dias = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / MS_POR_DIA);
+  const minimoRequerido = 7 * cantidadEquiposReal;
+  if (dias < minimoRequerido) {
+    return `La duración del torneo (${dias} día(s)) es menor a la mínima requerida: 7 días × ${cantidadEquiposReal} equipos = ${minimoRequerido} día(s).`;
+  }
+  return null;
+}
+
+/** Dos rangos de fechas se superponen si el inicio de cada uno cae antes (o
+ * el mismo día) que el fin del otro — misma fórmula que participacion.controler.ts. */
+function seSuperponen(a: { fechaInicio: Date; fechaFin: Date }, b: { fechaInicio: Date; fechaFin: Date }): boolean {
+  return a.fechaInicio <= b.fechaFin && b.fechaInicio <= a.fechaFin;
+}
+
+interface ConflictoFecha {
+  participacionId: number;
+  equipoId: number;
+  equipoNombre: string;
+  torneoConflictoId: number;
+  torneoConflictoNombre: string;
+}
+
+/** Regla 2 (generalizada): para cada equipo participante de `torneo`, busca
+ * sus OTRAS participaciones en torneos "borrador"/"inscripcion" cuyas fechas
+ * se superponen con `ventana`. `ventana` puede ser la fecha_fin ya persistida
+ * del torneo (activación) o una fecha_fin todavía no guardada (preview/
+ * confirmación de extensión) — no muta nada. */
+async function buscarConflictosDeSuperposicion(
+  txEm: typeof em,
+  torneo: Torneo,
+  ventana: { fechaInicio: Date; fechaFin: Date }
+): Promise<ConflictoFecha[]> {
+  const participaciones = await txEm.find(Participacion, { torneo: torneo.id }, { populate: ['equipo'] });
+  const conflictos: ConflictoFecha[] = [];
+
+  for (const participacion of participaciones) {
+    const otras = await txEm.find(
+      Participacion,
+      {
+        equipo: participacion.equipo.id,
+        $and: [{ torneo: { $ne: torneo.id } }, { torneo: { estado: { $in: ['borrador', 'inscripcion'] } } }],
+      },
+      { populate: ['torneo'] }
+    );
+    for (const otra of otras) {
+      if (seSuperponen(ventana, otra.torneo)) {
+        conflictos.push({
+          participacionId: otra.id!,
+          equipoId: participacion.equipo.id!,
+          equipoNombre: participacion.equipo.nombreEquipo,
+          torneoConflictoId: otra.torneo.id!,
+          torneoConflictoNombre: otra.torneo.nombreTorneo,
+        });
+      }
+    }
+  }
+  return conflictos;
+}
+
+/** Borra las participaciones en conflicto (Regla 2) y deja constancia en el
+ * log del servidor de cada remoción automática — no hay sistema de auditoría
+ * al que engancharse en este proyecto todavía. */
+async function removerParticipacionesEnConflicto(txEm: typeof em, conflictos: ConflictoFecha[]): Promise<void> {
+  for (const c of conflictos) {
+    await txEm.nativeDelete(Participacion, { id: c.participacionId });
+    console.log(
+      `[Regla 2] Equipo "${c.equipoNombre}" (id ${c.equipoId}) removido automáticamente de "${c.torneoConflictoNombre}" (torneo ${c.torneoConflictoId}) por superposición de fechas.`
+    );
+  }
 }
 
 function sanitizeTorneoInput(req: Request, res: Response, next: NextFunction) {
@@ -85,6 +167,13 @@ async function add(req: Request, res: Response) {
     }
 
     const data = { ...req.body.sanitizedInput, adminTorneo: req.user.id };
+
+    // Regla 3 NO se valida acá: un torneo recién creado tiene 0 equipos
+    // inscriptos por definición (todavía no existe ni tiene id), así que
+    // validar contra el conteo real siempre daría mínimo 0 días — no hay
+    // nada sensato que chequear hasta que empiecen a inscribirse equipos
+    // (ver participacion.controler.ts add(), que sí la valida en cada alta).
+
     const torneo = em.create(Torneo, data);
     await em.persistAndFlush(torneo);
 
@@ -94,6 +183,12 @@ async function add(req: Request, res: Response) {
   }
 }
 
+/** 🔹 PUT|PATCH /torneo/:id — con el torneo "en_curso", solo se permite tocar
+ * nombreTorneo y estado acá; fechaFin tiene su propio endpoint dedicado
+ * (PATCH /torneo/:id/fecha-fin) porque extenderla puede disparar la Regla 2.
+ * Si este update hace pasar el torneo a "en_curso" (sea porque lo activa a
+ * mano o por cualquier otro camino que no sea generarFixture), también
+ * dispara la Regla 2 dentro de la misma transacción. */
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -106,15 +201,69 @@ async function update(req: Request, res: Response) {
     if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
     const data = { ...req.body.sanitizedInput };
-    em.assign(torneoToUpdate, data);
-    await em.flush();
 
-    res.status(200).json({ message: 'torneo updated', data: torneoToUpdate });
+    if (torneoToUpdate.estado === 'en_curso') {
+      const bloqueados = ['fechaInicio', 'categoria', 'formato', 'cantidadEquipos'].filter(
+        (campo) => (data as any)[campo] !== undefined
+      );
+      if (bloqueados.length > 0) {
+        return res.status(400).json({ message: `Con el torneo en curso no se pueden modificar: ${bloqueados.join(', ')}.` });
+      }
+      if (data.fechaFin !== undefined) {
+        return res.status(400).json({
+          message: 'Para extender la fecha de fin de un torneo en curso usá PATCH /torneo/:id/fecha-fin (revisa conflictos con otros torneos antes de aplicar).',
+        });
+      }
+    }
+
+    // Solo se re-valida la duración si fechaInicio o fechaFin cambian —
+    // cantidadEquipos ya no participa de este cálculo (Regla 3 usa el
+    // conteo real de participaciones, no el cupo declarado).
+    if (data.fechaInicio !== undefined || data.fechaFin !== undefined) {
+      const fechaInicioEfectiva = data.fechaInicio ? new Date(data.fechaInicio) : torneoToUpdate.fechaInicio;
+      const fechaFinEfectiva = data.fechaFin ? new Date(data.fechaFin) : torneoToUpdate.fechaFin;
+      const equiposReales = await em.count(Participacion, { torneo: id });
+
+      const errorDuracion = validarDuracionMinima(fechaInicioEfectiva, fechaFinEfectiva, equiposReales);
+      if (errorDuracion) return res.status(400).json({ message: errorDuracion });
+    }
+
+    const activandose = data.estado === 'en_curso' && torneoToUpdate.estado !== 'en_curso';
+
+    const resultado = await em.transactional(async (txEm) => {
+      const torneoTx = await txEm.findOneOrFail(Torneo, { id });
+      txEm.assign(torneoTx, data);
+      await txEm.flush();
+
+      let conflictos: ConflictoFecha[] = [];
+      if (activandose) {
+        conflictos = await buscarConflictosDeSuperposicion(txEm, torneoTx, {
+          fechaInicio: torneoTx.fechaInicio,
+          fechaFin: torneoTx.fechaFin,
+        });
+        await removerParticipacionesEnConflicto(txEm, conflictos);
+      }
+      return { torneo: torneoTx, conflictos };
+    });
+
+    res.status(200).json({
+      message: resultado.conflictos.length > 0
+        ? `Torneo actualizado. Se removieron ${resultado.conflictos.length} equipo(s) de otros torneos por superposición de fechas.`
+        : 'torneo updated',
+      data: { torneo: resultado.torneo, equiposRemovidos: resultado.conflictos },
+    });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
   }
 }
 
+/** 🔹 DELETE /torneo/:id — borrado en cascada. Un Torneo no se puede borrar
+ * directo (Partido/Participacion/Notificacion/Suspension/TorneoArbitro/
+ * TorneoCancha lo referencian con FK RESTRICT), así que primero se limpia
+ * todo lo que depende de él, en el orden que exige la integridad referencial
+ * (Partido antes que Participacion porque Partido.local/visitante apuntan a
+ * Participacion), y recién al final el Torneo. Todo dentro de una única
+ * transacción: si cualquier paso falla, no queda un borrado a medias. */
 async function remove(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -126,10 +275,27 @@ async function remove(req: Request, res: Response) {
     const errorAuth = verificarAdminDueño(torneo, req);
     if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
-    await em.removeAndFlush(torneo);
-    res.status(204).end();
+    const nombreTorneo = torneo.nombreTorneo;
+
+    const resumen = await em.transactional(async (txEm) => {
+      const partidos = await txEm.nativeDelete(Partido, { torneo: id });
+      const notificaciones = await txEm.nativeDelete(Notificacion, { torneo: id });
+      const suspensiones = await txEm.nativeDelete(Suspension, { torneo: id });
+      const arbitrosAsignados = await txEm.nativeDelete(TorneoArbitro, { torneo: id });
+      const canchasAsignadas = await txEm.nativeDelete(TorneoCancha, { torneo: id });
+      const participaciones = await txEm.nativeDelete(Participacion, { torneo: id });
+      await txEm.nativeDelete(Torneo, { id });
+
+      return { participaciones, partidos, notificaciones, suspensiones, arbitrosAsignados, canchasAsignadas };
+    });
+
+    res.status(200).json({
+      message: `Torneo "${nombreTorneo}" eliminado junto con ${resumen.participaciones} participaciones, ${resumen.partidos} partidos, ${resumen.suspensiones} suspensiones y ${resumen.notificaciones} notificaciones.`,
+      data: resumen,
+    });
   } catch (e: any) {
-    res.status(500).json({ message: e.message });
+    console.error('Error al eliminar torneo (se hizo rollback):', e);
+    res.status(500).json({ message: `No se pudo eliminar el torneo: ${e.message}` });
   }
 }
 
@@ -328,12 +494,134 @@ async function generarFixture(req: Request, res: Response) {
     torneo.estado = 'en_curso';
     await em.flush();
 
+    // Regla 2: al activarse el torneo, los equipos participantes quedan
+    // "comprometidos" con sus fechas — se los saca de cualquier otro torneo
+    // borrador/inscripción con el que ahora se superpongan.
+    const conflictos = await buscarConflictosDeSuperposicion(em, torneo, {
+      fechaInicio: torneo.fechaInicio,
+      fechaFin: torneo.fechaFin,
+    });
+    await removerParticipacionesEnConflicto(em, conflictos);
+
     res.status(201).json({
-      message: `Fixture generado: ${partidos.length} partidos en ${rondas.length} jornadas`,
-      data: { totalPartidos: partidos.length, totalJornadas: rondas.length },
+      message: `Fixture generado: ${partidos.length} partidos en ${rondas.length} jornadas.`
+        + (conflictos.length > 0 ? ` Se removieron ${conflictos.length} equipo(s) de otros torneos por superposición de fechas.` : ''),
+      data: { totalPartidos: partidos.length, totalJornadas: rondas.length, equiposRemovidos: conflictos },
     });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
+  }
+}
+
+/** 🔹 POST /torneo/:id/fecha-fin/preview — Regla 2 aplicada a una fecha_fin
+ * hipotética: no muta nada, solo devuelve qué participaciones quedarían en
+ * conflicto si se aplicara. Solo tiene sentido para un torneo "en_curso" —
+ * la fechaFin de un torneo que no arrancó se edita por el PATCH genérico. */
+async function previewFechaFin(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const torneo = await em.findOne(Torneo, { id }, { populate: ['adminTorneo'] });
+    if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const errorAuth = verificarAdminDueño(torneo, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
+
+    if (torneo.estado !== 'en_curso') {
+      return res.status(400).json({ message: 'Este endpoint es solo para extender la fecha fin de un torneo en curso.' });
+    }
+
+    const nuevaFechaFin = new Date(req.body.fechaFin);
+    if (Number.isNaN(nuevaFechaFin.getTime())) {
+      return res.status(400).json({ message: 'fechaFin inválida' });
+    }
+
+    const equiposReales = await em.count(Participacion, { torneo: id });
+    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, nuevaFechaFin, equiposReales);
+    if (errorDuracion) return res.status(400).json({ message: errorDuracion });
+
+    const conflictos = await buscarConflictosDeSuperposicion(em, torneo, {
+      fechaInicio: torneo.fechaInicio,
+      fechaFin: nuevaFechaFin,
+    });
+
+    res.status(200).json({
+      message: conflictos.length > 0
+        ? `Extender la fecha fin removería ${conflictos.length} equipo(s) de otros torneos por superposición de fechas.`
+        : 'Sin conflictos: la fecha fin se puede extender directamente.',
+      data: { conflictos },
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+}
+
+/** 🔹 PATCH /torneo/:id/fecha-fin — aplica la extensión. Si hay conflictos y
+ * no vino `confirmarCascada: true`, no aplica ningún cambio y devuelve 409
+ * con la misma lista que el preview (no confía en que el frontend haya
+ * llamado al preview antes). Todo dentro de una transacción: fechaFin nueva
+ * + remoción de las participaciones en conflicto. */
+async function extenderFechaFin(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const torneo = await em.findOne(Torneo, { id }, { populate: ['adminTorneo'] });
+    if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    const errorAuth = verificarAdminDueño(torneo, req);
+    if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
+
+    if (torneo.estado !== 'en_curso') {
+      return res.status(400).json({ message: 'Este endpoint es solo para extender la fecha fin de un torneo en curso.' });
+    }
+
+    const nuevaFechaFin = new Date(req.body.fechaFin);
+    if (Number.isNaN(nuevaFechaFin.getTime())) {
+      return res.status(400).json({ message: 'fechaFin inválida' });
+    }
+
+    // Regla 3 primero — ni vale la pena calcular conflictos si la duración
+    // ya es inválida para este mismo torneo. Se valida contra el conteo real
+    // de equipos inscriptos, no contra Torneo.cantidadEquipos.
+    const equiposReales = await em.count(Participacion, { torneo: id });
+    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, nuevaFechaFin, equiposReales);
+    if (errorDuracion) return res.status(400).json({ message: errorDuracion });
+
+    const conflictos = await buscarConflictosDeSuperposicion(em, torneo, {
+      fechaInicio: torneo.fechaInicio,
+      fechaFin: nuevaFechaFin,
+    });
+
+    const confirmarCascada = req.body.confirmarCascada === true;
+    if (conflictos.length > 0 && !confirmarCascada) {
+      return res.status(409).json({
+        message: `Extender la fecha fin removería ${conflictos.length} equipo(s) de otros torneos por superposición de fechas. Confirmá para aplicar.`,
+        data: { conflictos },
+      });
+    }
+
+    const resultado = await em.transactional(async (txEm) => {
+      const torneoTx = await txEm.findOneOrFail(Torneo, { id });
+      torneoTx.fechaFin = nuevaFechaFin;
+      await txEm.flush();
+
+      if (conflictos.length > 0) {
+        await removerParticipacionesEnConflicto(txEm, conflictos);
+      }
+      return torneoTx;
+    });
+
+    res.status(200).json({
+      message: conflictos.length > 0
+        ? `Fecha fin extendida. Se removieron ${conflictos.length} equipo(s) de otros torneos por superposición de fechas.`
+        : 'Fecha fin extendida.',
+      data: { torneo: resultado, equiposRemovidos: conflictos },
+    });
+  } catch (e: any) {
+    console.error('Error al extender fecha fin (se hizo rollback):', e);
+    res.status(500).json({ message: `No se pudo extender la fecha fin: ${e.message}` });
   }
 }
 
@@ -350,4 +638,6 @@ export {
   setCanchas,
   generarFixture,
   generarRondas,
+  previewFechaFin,
+  extenderFechaFin,
 };
