@@ -12,6 +12,7 @@ import bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
 import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
+import { procesarBajaAutomaticaSiCorresponde } from '../equipo/equipo.controler.js';
 
 const em = orm.em;
 const googleClient = new OAuth2Client();
@@ -263,6 +264,12 @@ async function update(req: Request, res: Response) {
           console.log('Equipo eliminado porque se quedó sin jugadores');
         }
 
+        // Solo tiene sentido si el equipo sigue existiendo (si se quedó sin
+        // nadie, ya se borró arriba y no hay participaciones que dar de baja).
+        if (otrosJugadores.length > 0) {
+          await procesarBajaAutomaticaSiCorresponde(txEm, equipoAnterior.id!);
+        }
+
       } else if (equipo) {
         // Caso: se asigna un nuevo equipo
         // Fix #3: si ya tiene un equipo DISTINTO, desvincularlo primero
@@ -400,6 +407,8 @@ async function expulsar(req: Request, res: Response) {
 
       const equipo = capitan.equipo;
       jugadorObjetivo.equipo = null;
+
+      await procesarBajaAutomaticaSiCorresponde(txEm, equipo.id!);
 
       const notificacion = txEm.create(Notificacion, {
         jugador: jugadorObjetivo,

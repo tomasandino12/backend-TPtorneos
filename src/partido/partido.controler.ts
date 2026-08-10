@@ -130,7 +130,10 @@ async function findProgramados(_req: Request, res: Response) {
  * Solo el admin dueño del torneo puede hacerlo, y solo mientras el torneo
  * está "en_curso" (no tiene sentido cargar resultados de un torneo que
  * todavía no arrancó o que ya cerró). goles_local/goles_visitante tienen que
- * ser enteros >= 0. Marca el partido como 'jugado'. */
+ * ser enteros >= 0. Marca el partido como 'finalizado' — el mismo valor que
+ * ya esperaban getEstadisticasTorneo/calcularEstadisticas (equipo.controler.ts)
+ * y las pantallas de estadísticas del jugador; antes este endpoint usaba
+ * 'jugado', que ningún otro lugar del código leía. */
 async function actualizarResultado(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -157,7 +160,8 @@ async function actualizarResultado(req: Request, res: Response) {
 
     partido.goles_local = golesLocal;
     partido.goles_visitante = golesVisitante;
-    partido.estado_partido = 'jugado';
+    partido.estado_partido = 'finalizado';
+    partido.walkover = false; // un resultado cargado a mano deja de ser W.O., aunque lo hubiera sido antes
     await em.flush();
 
     res.status(200).json({ message: 'Resultado cargado', data: partido });

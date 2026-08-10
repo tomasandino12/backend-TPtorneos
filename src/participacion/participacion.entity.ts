@@ -19,6 +19,12 @@ export class Participacion extends BaseEntity {
   @Property()
   fecha_inscripcion!: Date;
 
+  // 'activo' | 'dado_de_baja' — se pasa a 'dado_de_baja' automáticamente si
+  // el plantel del equipo cae por debajo del mínimo mientras el torneo está
+  // en_curso (ver equipo.controler.ts, procesarBajaAutomaticaSiCorresponde).
+  @Property({ nullable: false, default: 'activo' })
+  estado_participacion!: string;
+
   @OneToMany('Partido', 'local')
   partidosLocal = new Collection<Partido>(this);
 

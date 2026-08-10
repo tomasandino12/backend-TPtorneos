@@ -7,6 +7,7 @@ import { Jugador } from '../jugador/jugador.entity.js';
 import { Participacion } from '../participacion/participacion.entity.js';
 import { Partido } from '../partido/partido.entity.js';
 import { Suspension } from '../suspension/suspension.entity.js';
+import { MIN_JUGADORES_PLANTEL_TORNEO } from '../shared/constants.js';
 
 const em = orm.em;
 
@@ -30,6 +31,69 @@ async function verificarCapitanDueño(
   return null;
 }
 
+/** Baja automática: si el plantel de un equipo cae por debajo de
+ * MIN_JUGADORES_PLANTEL_TORNEO, se lo da de baja de todas sus participaciones
+ * activas en torneos en_curso, y se le sobrescribe el resultado de sus
+ * partidos todavía no jugados de esos torneos: 3-0 a favor del rival si el
+ * rival sigue activo, o 0-0 (sin puntos para nadie) si el rival también está
+ * de baja. Se llama SIEMPRE dentro de la misma transacción que sacó al
+ * jugador del equipo (jugador.controler.ts: update() y expulsar()) — recibe
+ * el EntityManager transaccional, nunca el `em` global. No hace nada si el
+ * equipo no tiene ninguna participación activa en un torneo en_curso. */
+export async function procesarBajaAutomaticaSiCorresponde(txEm: typeof em, equipoId: number): Promise<void> {
+  const cantidadJugadores = await txEm.count(Jugador, { equipo: equipoId });
+  if (cantidadJugadores >= MIN_JUGADORES_PLANTEL_TORNEO) return;
+
+  const participacionesActivas = await txEm.find(
+    Participacion,
+    { equipo: equipoId, estado_participacion: 'activo', torneo: { estado: 'en_curso' } },
+    { populate: ['torneo', 'equipo'] }
+  );
+
+  for (const participacion of participacionesActivas) {
+    participacion.estado_participacion = 'dado_de_baja';
+
+    const partidosPendientes = await txEm.find(
+      Partido,
+      {
+        torneo: participacion.torneo.id,
+        estado_partido: { $ne: 'finalizado' },
+        $or: [{ local: participacion.id }, { visitante: participacion.id }],
+      },
+      { populate: ['local.equipo', 'visitante.equipo'] }
+    );
+
+    for (const partido of partidosPendientes) {
+      const esteEquipoEsLocal = partido.local.id === participacion.id;
+      const rival = esteEquipoEsLocal ? partido.visitante : partido.local;
+
+      if (rival.estado_participacion === 'dado_de_baja') {
+        partido.goles_local = 0;
+        partido.goles_visitante = 0;
+      } else if (esteEquipoEsLocal) {
+        partido.goles_local = 0;
+        partido.goles_visitante = 3;
+      } else {
+        partido.goles_local = 3;
+        partido.goles_visitante = 0;
+      }
+      partido.estado_partido = 'finalizado';
+      partido.walkover = true;
+
+      console.log(
+        `[Baja automática] Partido ${partido.id} (torneo ${participacion.torneo.id} "${participacion.torneo.nombreTorneo}") ` +
+        `sobrescrito por W.O.: ${partido.local.equipo?.nombreEquipo ?? partido.local.id} ${partido.goles_local}-${partido.goles_visitante} ` +
+        `${partido.visitante.equipo?.nombreEquipo ?? partido.visitante.id}.`
+      );
+    }
+
+    console.log(
+      `[Baja automática] Equipo "${participacion.equipo.nombreEquipo}" (id ${equipoId}) dado de baja del torneo ` +
+      `"${participacion.torneo.nombreTorneo}" (id ${participacion.torneo.id}) — plantel cayó a ${cantidadJugadores} jugador(es).`
+    );
+  }
+}
+
 /** 🔹 Sanitiza el body */
 function sanitizeEquipoInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
@@ -47,6 +111,14 @@ function sanitizeEquipoInput(req: Request, res: Response, next: NextFunction) {
   const categoriasValidas = ['sub15', 'sub17', 'mayores', 'veteranos', 'femenino'];
   if (req.body.sanitizedInput.categoria && !categoriasValidas.includes(req.body.sanitizedInput.categoria)) {
     return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${categoriasValidas.join(', ')}` });
+  }
+
+  // Obligatoria solo al crear (POST): este mismo middleware también corre en
+  // PUT/PATCH /equipos/:id, donde una edición parcial (ej. solo la
+  // descripción, ver EquipoInfo.jsx handleGuardarDescripcion) no tiene por
+  // qué reenviar la categoría del equipo ya existente.
+  if (req.method === 'POST' && !req.body.sanitizedInput.categoria) {
+    return res.status(400).json({ message: 'La categoría del equipo es obligatoria.' });
   }
 
   next();
@@ -311,6 +383,7 @@ async function getEstadisticasTorneo(req: Request, res: Response) {
         dg,
         pts,
         posicion: 0,
+        estadoParticipacion: participacion.estado_participacion,
       });
     }
 

@@ -28,6 +28,11 @@ export class Partido extends BaseEntity {
   @Property({ nullable: true })
   goles_visitante!: number;
 
+  // true si el resultado no se jugó de verdad — lo forzó la baja automática
+  // de un equipo (3-0 al rival, o 0-0 si los dos equipos están de baja).
+  @Property({ nullable: false, default: false })
+  walkover!: boolean;
+
   @ManyToOne('Torneo')
   torneo!: Torneo;
 

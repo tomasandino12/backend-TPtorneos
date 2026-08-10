@@ -230,6 +230,20 @@ async function update(req: Request, res: Response) {
 
     const activandose = data.estado === 'en_curso' && torneoToUpdate.estado !== 'en_curso';
 
+    // El único camino válido a "en_curso" es generarFixture(), que primero
+    // crea los Partidos y recién después fuerza el estado. Si este PATCH
+    // genérico dejara pasar "en_curso" sin partidos, el torneo queda en un
+    // estado inconsistente (fue justo el bug reportado: el panel de admin
+    // decía "fixture ya generado" con 0 partidos reales).
+    if (activandose) {
+      const tienePartidos = await em.count(Partido, { torneo: id });
+      if (tienePartidos === 0) {
+        return res.status(409).json({
+          message: "No se puede pasar el torneo a 'en_curso' sin generar el fixture primero. Usá la opción 'Generar Fixture'.",
+        });
+      }
+    }
+
     const resultado = await em.transactional(async (txEm) => {
       const torneoTx = await txEm.findOneOrFail(Torneo, { id });
       txEm.assign(torneoTx, data);
@@ -479,6 +493,7 @@ async function generarFixture(req: Request, res: Response) {
           jornada: j + 1,
           goles_local: 0,
           goles_visitante: 0,
+          walkover: false,
           cancha: canchaIds[canchaIdx % canchaIds.length],
           arbitro: arbitroIds[arbitroIdx % arbitroIds.length],
         });
