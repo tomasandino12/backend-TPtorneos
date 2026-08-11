@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generarRondas } from './torneo.controler.js';
+import { generarRondas, elegirReemplazoMenosCargado } from './torneo.controler.js';
 import type { Participacion } from '../participacion/participacion.entity.js';
 
 /** Helper: arma participaciones "de mentira" (solo con id, que es lo único
@@ -60,5 +60,27 @@ describe('generarRondas (round-robin del fixture)', () => {
       expect(primeraJornadaVuelta[i][0].id).toBe(visitante.id);
       expect(primeraJornadaVuelta[i][1].id).toBe(local.id);
     });
+  });
+});
+
+describe('elegirReemplazoMenosCargado (reasignación al sacar un árbitro/cancha de un torneo)', () => {
+  it('elige el candidato con menor carga', () => {
+    const carga = new Map([[10, 3], [20, 1], [30, 2]]);
+    expect(elegirReemplazoMenosCargado([10, 20, 30], carga)).toBe(20);
+  });
+
+  it('en caso de empate, elige el primero del array', () => {
+    const carga = new Map([[10, 2], [20, 2], [30, 2]]);
+    expect(elegirReemplazoMenosCargado([10, 20, 30], carga)).toBe(10);
+  });
+
+  it('trata como carga 0 a un candidato sin entrada en el mapa', () => {
+    const carga = new Map([[10, 1]]);
+    expect(elegirReemplazoMenosCargado([10, 20], carga)).toBe(20);
+  });
+
+  it('con un solo candidato, lo devuelve siempre', () => {
+    const carga = new Map([[10, 5]]);
+    expect(elegirReemplazoMenosCargado([10], carga)).toBe(10);
   });
 });

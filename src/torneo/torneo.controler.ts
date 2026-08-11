@@ -9,6 +9,7 @@ import { Arbitro } from '../arbitro/arbitro.entity.js';
 import { Cancha } from '../cancha/cancha.entity.js';
 import { Notificacion } from '../notificacion/notificacion.entity.js';
 import { Suspension } from '../suspension/suspension.entity.js';
+import { MIN_ARBITROS_TORNEO, MIN_CANCHAS_TORNEO } from '../shared/constants.js';
 
 const em = orm.em;
 
@@ -313,6 +314,23 @@ async function remove(req: Request, res: Response) {
   }
 }
 
+/** Elige, entre los candidatos, el que menos partidos 'programado' tiene
+ * cargados en este torneo (empate: el primero del array). Pura y testeable
+ * sin DB — usada por setArbitros/setCanchas para repartir parejo cuando hay
+ * que reasignar los partidos de un árbitro/cancha que se sacó del torneo. */
+function elegirReemplazoMenosCargado(candidatos: number[], cargaPorId: Map<number, number>): number {
+  let elegido = candidatos[0];
+  let menorCarga = cargaPorId.get(elegido) ?? 0;
+  for (const id of candidatos.slice(1)) {
+    const carga = cargaPorId.get(id) ?? 0;
+    if (carga < menorCarga) {
+      elegido = id;
+      menorCarga = carga;
+    }
+  }
+  return elegido;
+}
+
 /** 🔹 GET /torneo/:id/arbitros — árbitros asignados a este torneo */
 async function getArbitros(req: Request, res: Response) {
   try {
@@ -326,7 +344,13 @@ async function getArbitros(req: Request, res: Response) {
   }
 }
 
-/** 🔹 PUT /torneo/:id/arbitros — body { arbitroIds }, reemplaza el set completo */
+/** 🔹 PUT /torneo/:id/arbitros — body { arbitroIds }, reemplaza el set completo.
+ * El set nuevo tiene que ser 0 (todavía sin asignar) o >= MIN_ARBITROS_TORNEO,
+ * nunca un valor intermedio. Si se saca un árbitro que tenía partidos
+ * 'programado' asignados, se reasignan automáticamente a uno de los árbitros
+ * que quedan (el que menos partidos programados tenga en este torneo), dentro
+ * de la misma transacción que actualiza el set — los partidos 'finalizado' no
+ * se tocan, ya se jugaron con ese árbitro. */
 async function setArbitros(req: Request, res: Response) {
   try {
     const torneoId = Number(req.params.id);
@@ -338,7 +362,7 @@ async function setArbitros(req: Request, res: Response) {
     const errorAuth = verificarAdminDueño(torneo, req);
     if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
-    const arbitroIds: number[] = Array.isArray(req.body.arbitroIds) ? req.body.arbitroIds : [];
+    const arbitroIds: number[] = (Array.isArray(req.body.arbitroIds) ? req.body.arbitroIds : []).map(Number);
 
     if (arbitroIds.length > 0) {
       const encontrados = await em.count(Arbitro, { id: { $in: arbitroIds } });
@@ -347,11 +371,70 @@ async function setArbitros(req: Request, res: Response) {
       }
     }
 
-    await em.nativeDelete(TorneoArbitro, { torneo: torneoId });
-    const nuevas = arbitroIds.map((arbitroId) => em.create(TorneoArbitro, { torneo: torneoId, arbitro: Number(arbitroId) }));
-    await em.persistAndFlush(nuevas);
+    if (arbitroIds.length > 0 && arbitroIds.length < MIN_ARBITROS_TORNEO) {
+      return res.status(400).json({
+        message: `Un torneo debe tener al menos ${MIN_ARBITROS_TORNEO} árbitros asignados (o ninguno, si todavía no asignaste).`,
+      });
+    }
 
-    res.status(200).json({ message: 'Árbitros del torneo actualizados', data: nuevas });
+    const viejasAsociaciones = await em.find(TorneoArbitro, { torneo: torneoId }, { populate: ['arbitro'] });
+    const idsViejos = viejasAsociaciones.map((ta) => ta.arbitro.id as number);
+    const idsNuevosSet = new Set(arbitroIds);
+    const removidos = idsViejos.filter((id) => !idsNuevosSet.has(id));
+
+    if (arbitroIds.length === 0) {
+      const hayProgramados = await em.count(Partido, { torneo: torneoId, estado_partido: 'programado' });
+      if (hayProgramados > 0) {
+        return res.status(400).json({
+          message: 'No podés quitar todos los árbitros mientras haya partidos programados sin finalizar.',
+        });
+      }
+    }
+
+    let partidosAfectados: Partido[] = [];
+    if (removidos.length > 0 && arbitroIds.length > 0) {
+      partidosAfectados = await em.find(
+        Partido,
+        { torneo: torneoId, estado_partido: 'programado', arbitro: { $in: removidos } },
+        { populate: ['arbitro'] }
+      );
+    }
+
+    const resultado = await em.transactional(async (txEm) => {
+      const reasignaciones: { partidoId: number; arbitroAnteriorId: number; arbitroNuevoId: number }[] = [];
+
+      if (partidosAfectados.length > 0) {
+        const cargaPorId = new Map<number, number>();
+        for (const cid of arbitroIds) {
+          cargaPorId.set(cid, await txEm.count(Partido, { torneo: torneoId, estado_partido: 'programado', arbitro: cid }));
+        }
+        for (const partidoRef of partidosAfectados) {
+          const partido = await txEm.findOneOrFail(Partido, { id: partidoRef.id });
+          // El id anterior se tiene que leer ANTES de reasignar: em.transactional()
+          // forkea con clear:false, así que `partido` es el mismo objeto en memoria
+          // que `partidoRef` (comparten identity map) — mutar uno muta el otro.
+          const arbitroAnteriorId = partido.arbitro.id as number;
+          const elegido = elegirReemplazoMenosCargado(arbitroIds, cargaPorId);
+          partido.arbitro = txEm.getReference(Arbitro, elegido);
+          cargaPorId.set(elegido, (cargaPorId.get(elegido) ?? 0) + 1);
+          reasignaciones.push({ partidoId: partido.id!, arbitroAnteriorId, arbitroNuevoId: elegido });
+        }
+        await txEm.flush();
+      }
+
+      await txEm.nativeDelete(TorneoArbitro, { torneo: torneoId });
+      const nuevas = arbitroIds.map((arbitroId) => txEm.create(TorneoArbitro, { torneo: torneoId, arbitro: arbitroId }));
+      await txEm.persistAndFlush(nuevas);
+
+      return { nuevas, reasignaciones };
+    });
+
+    res.status(200).json({
+      message: resultado.reasignaciones.length > 0
+        ? `Árbitros del torneo actualizados. Se reasignaron ${resultado.reasignaciones.length} partido(s) que tenían un árbitro removido.`
+        : 'Árbitros del torneo actualizados',
+      data: { asignaciones: resultado.nuevas, partidosReasignados: resultado.reasignaciones },
+    });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
   }
@@ -370,7 +453,10 @@ async function getCanchas(req: Request, res: Response) {
   }
 }
 
-/** 🔹 PUT /torneo/:id/canchas — body { canchaIds }, reemplaza el set completo */
+/** 🔹 PUT /torneo/:id/canchas — body { canchaIds }, reemplaza el set completo.
+ * Misma regla que setArbitros: 0 o >= MIN_CANCHAS_TORNEO, nunca un valor
+ * intermedio, y reasignación automática de los partidos 'programado' que
+ * tenían asignada una cancha removida (ver comentario de setArbitros). */
 async function setCanchas(req: Request, res: Response) {
   try {
     const torneoId = Number(req.params.id);
@@ -382,7 +468,7 @@ async function setCanchas(req: Request, res: Response) {
     const errorAuth = verificarAdminDueño(torneo, req);
     if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
 
-    const canchaIds: number[] = Array.isArray(req.body.canchaIds) ? req.body.canchaIds : [];
+    const canchaIds: number[] = (Array.isArray(req.body.canchaIds) ? req.body.canchaIds : []).map(Number);
 
     if (canchaIds.length > 0) {
       const encontradas = await em.count(Cancha, { id: { $in: canchaIds } });
@@ -391,11 +477,69 @@ async function setCanchas(req: Request, res: Response) {
       }
     }
 
-    await em.nativeDelete(TorneoCancha, { torneo: torneoId });
-    const nuevas = canchaIds.map((canchaId) => em.create(TorneoCancha, { torneo: torneoId, cancha: Number(canchaId) }));
-    await em.persistAndFlush(nuevas);
+    if (canchaIds.length > 0 && canchaIds.length < MIN_CANCHAS_TORNEO) {
+      return res.status(400).json({
+        message: `Un torneo debe tener al menos ${MIN_CANCHAS_TORNEO} canchas asignadas (o ninguna, si todavía no asignaste).`,
+      });
+    }
 
-    res.status(200).json({ message: 'Canchas del torneo actualizadas', data: nuevas });
+    const viejasAsociaciones = await em.find(TorneoCancha, { torneo: torneoId }, { populate: ['cancha'] });
+    const idsViejos = viejasAsociaciones.map((tc) => tc.cancha.id as number);
+    const idsNuevosSet = new Set(canchaIds);
+    const removidas = idsViejos.filter((id) => !idsNuevosSet.has(id));
+
+    if (canchaIds.length === 0) {
+      const hayProgramados = await em.count(Partido, { torneo: torneoId, estado_partido: 'programado' });
+      if (hayProgramados > 0) {
+        return res.status(400).json({
+          message: 'No podés quitar todas las canchas mientras haya partidos programados sin finalizar.',
+        });
+      }
+    }
+
+    let partidosAfectados: Partido[] = [];
+    if (removidas.length > 0 && canchaIds.length > 0) {
+      partidosAfectados = await em.find(
+        Partido,
+        { torneo: torneoId, estado_partido: 'programado', cancha: { $in: removidas } },
+        { populate: ['cancha'] }
+      );
+    }
+
+    const resultado = await em.transactional(async (txEm) => {
+      const reasignaciones: { partidoId: number; canchaAnteriorId: number; canchaNuevaId: number }[] = [];
+
+      if (partidosAfectados.length > 0) {
+        const cargaPorId = new Map<number, number>();
+        for (const cid of canchaIds) {
+          cargaPorId.set(cid, await txEm.count(Partido, { torneo: torneoId, estado_partido: 'programado', cancha: cid }));
+        }
+        for (const partidoRef of partidosAfectados) {
+          const partido = await txEm.findOneOrFail(Partido, { id: partidoRef.id });
+          // Ver comentario equivalente en setArbitros: hay que leer el id
+          // anterior ANTES de reasignar (mismo objeto en memoria que partidoRef).
+          const canchaAnteriorId = partido.cancha.id as number;
+          const elegida = elegirReemplazoMenosCargado(canchaIds, cargaPorId);
+          partido.cancha = txEm.getReference(Cancha, elegida);
+          cargaPorId.set(elegida, (cargaPorId.get(elegida) ?? 0) + 1);
+          reasignaciones.push({ partidoId: partido.id!, canchaAnteriorId, canchaNuevaId: elegida });
+        }
+        await txEm.flush();
+      }
+
+      await txEm.nativeDelete(TorneoCancha, { torneo: torneoId });
+      const nuevas = canchaIds.map((canchaId) => txEm.create(TorneoCancha, { torneo: torneoId, cancha: canchaId }));
+      await txEm.persistAndFlush(nuevas);
+
+      return { nuevas, reasignaciones };
+    });
+
+    res.status(200).json({
+      message: resultado.reasignaciones.length > 0
+        ? `Canchas del torneo actualizadas. Se reasignaron ${resultado.reasignaciones.length} partido(s) que tenían una cancha removida.`
+        : 'Canchas del torneo actualizadas',
+      data: { asignaciones: resultado.nuevas, partidosReasignados: resultado.reasignaciones },
+    });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
   }
@@ -468,9 +612,9 @@ async function generarFixture(req: Request, res: Response) {
     const arbitroIds = torneoArbitros.map((ta) => ta.arbitro.id).filter((aid): aid is number => aid !== undefined);
     const canchaIds = torneoCanchas.map((tc) => tc.cancha.id).filter((cid): cid is number => cid !== undefined);
 
-    if (!arbitroIds.length || !canchaIds.length) {
+    if (arbitroIds.length < MIN_ARBITROS_TORNEO || canchaIds.length < MIN_CANCHAS_TORNEO) {
       return res.status(400).json({
-        message: 'Asigná al menos un árbitro y una cancha al torneo antes de generar el fixture (pestañas Árbitros y Canchas)',
+        message: `Asigná al menos ${MIN_ARBITROS_TORNEO} árbitros y ${MIN_CANCHAS_TORNEO} canchas al torneo antes de generar el fixture (pestañas Árbitros y Canchas)`,
       });
     }
 
@@ -653,6 +797,7 @@ export {
   setCanchas,
   generarFixture,
   generarRondas,
+  elegirReemplazoMenosCargado,
   previewFechaFin,
   extenderFechaFin,
 };

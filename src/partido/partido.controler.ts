@@ -150,6 +150,17 @@ async function actualizarResultado(req: Request, res: Response) {
       return res.status(400).json({ message: 'Solo se puede cargar el resultado de un partido de un torneo en curso' });
     }
 
+    if (new Date(partido.fecha_partido) > new Date()) {
+      return res.status(400).json({ message: 'No se puede cargar el resultado de un partido que todavía no se jugó' });
+    }
+
+    if (partido.estado_partido === 'finalizado' && req.body.confirmarReedicion !== true) {
+      return res.status(409).json({
+        message: `Este partido ya tiene un resultado cargado (${partido.goles_local}-${partido.goles_visitante}). Confirmá para sobreescribirlo.`,
+        data: { goles_local: partido.goles_local, goles_visitante: partido.goles_visitante },
+      });
+    }
+
     const golesLocal = Number(req.body.goles_local);
     const golesVisitante = Number(req.body.goles_visitante);
     const esEnteroNoNegativo = (v: number) => Number.isInteger(v) && v >= 0;
