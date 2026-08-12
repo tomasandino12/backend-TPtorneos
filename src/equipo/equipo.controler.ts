@@ -376,6 +376,7 @@ async function getEstadisticasTorneo(req: Request, res: Response) {
       estadisticas.push({
         id: equipo.id,
         nombreEquipo: equipo.nombreEquipo,
+        colorPrimario: equipo.colorPrimario,
         pj,
         pg,
         pe,
