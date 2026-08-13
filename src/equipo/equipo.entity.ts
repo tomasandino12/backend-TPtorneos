@@ -5,7 +5,7 @@ import { BaseEntity } from '../shared/db/baseEntity.entity.js';
 import type { Jugador } from '../jugador/jugador.entity.js';
 import type { Participacion } from '../participacion/participacion.entity.js';
 
-// Categoria: 'sub15' | 'sub17' | 'mayores' | 'veteranos' | 'femenino'
+// Categoria: ver la lista y reglas de género/edad en shared/categorias.ts (CATEGORIAS)
 @Entity()
 export class Equipo extends BaseEntity {
 

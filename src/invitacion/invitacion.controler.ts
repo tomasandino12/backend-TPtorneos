@@ -4,6 +4,7 @@ import { Invitacion } from './invitacion.entity.js';
 import { Jugador } from '../jugador/jugador.entity.js';
 import { Notificacion } from '../notificacion/notificacion.entity.js';
 import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
+import { validarJugadorParaCategoria } from '../shared/categorias.js';
 
 const em = orm.em;
 
@@ -181,6 +182,11 @@ async function responder(req: Request, res: Response) {
             new Error(`El equipo ya alcanzó el límite de ${MAX_JUGADORES_PLANTEL} jugadores`),
             { status: 400 }
           );
+        }
+
+        const errorCategoria = validarJugadorParaCategoria(jugador, invitacion.equipo.categoria);
+        if (errorCategoria) {
+          throw Object.assign(new Error(errorCategoria), { status: 409 });
         }
 
         jugador.equipo = invitacion.equipo;

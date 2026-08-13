@@ -8,6 +8,7 @@ import { Participacion } from '../participacion/participacion.entity.js';
 import { Partido } from '../partido/partido.entity.js';
 import { Suspension } from '../suspension/suspension.entity.js';
 import { MIN_JUGADORES_PLANTEL_TORNEO } from '../shared/constants.js';
+import { CATEGORIAS_VALIDAS, validarJugadorParaCategoria } from '../shared/categorias.js';
 
 const em = orm.em;
 
@@ -108,9 +109,8 @@ function sanitizeEquipoInput(req: Request, res: Response, next: NextFunction) {
     if (req.body.sanitizedInput[k] === undefined) delete req.body.sanitizedInput[k];
   });
 
-  const categoriasValidas = ['sub15', 'sub17', 'mayores', 'veteranos', 'femenino'];
-  if (req.body.sanitizedInput.categoria && !categoriasValidas.includes(req.body.sanitizedInput.categoria)) {
-    return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${categoriasValidas.join(', ')}` });
+  if (req.body.sanitizedInput.categoria && !CATEGORIAS_VALIDAS.includes(req.body.sanitizedInput.categoria)) {
+    return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${CATEGORIAS_VALIDAS.join(', ')}` });
   }
 
   // Obligatoria solo al crear (POST): este mismo middleware también corre en

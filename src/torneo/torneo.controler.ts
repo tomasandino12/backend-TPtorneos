@@ -10,6 +10,7 @@ import { Cancha } from '../cancha/cancha.entity.js';
 import { Notificacion } from '../notificacion/notificacion.entity.js';
 import { Suspension } from '../suspension/suspension.entity.js';
 import { MIN_ARBITROS_TORNEO, MIN_CANCHAS_TORNEO } from '../shared/constants.js';
+import { CATEGORIAS_VALIDAS } from '../shared/categorias.js';
 
 const em = orm.em;
 
@@ -119,9 +120,8 @@ function sanitizeTorneoInput(req: Request, res: Response, next: NextFunction) {
     adminTorneo: req.body.adminTorneo, // FK
   };
 
-  const categoriasValidas = ['sub15', 'sub17', 'mayores', 'veteranos', 'femenino'];
-  if (req.body.sanitizedInput.categoria && !categoriasValidas.includes(req.body.sanitizedInput.categoria)) {
-    return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${categoriasValidas.join(', ')}` });
+  if (req.body.sanitizedInput.categoria && !CATEGORIAS_VALIDAS.includes(req.body.sanitizedInput.categoria)) {
+    return res.status(400).json({ message: `Categoría inválida. Valores permitidos: ${CATEGORIAS_VALIDAS.join(', ')}` });
   }
 
   const estadosValidos = ['borrador', 'inscripcion', 'en_curso', 'finalizado'];

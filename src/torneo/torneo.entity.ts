@@ -10,7 +10,7 @@ import type { Participacion } from '../participacion/participacion.entity.js';
 // Estado: 'borrador' (recién creado, sin abrir inscripciones) | 'inscripcion'
 // (equipos se pueden agregar) | 'en_curso' (fixture generado, partidos en
 // juego) | 'finalizado' (todos los partidos con resultado)
-// Categoria: 'sub15' | 'sub17' | 'mayores' | 'veteranos' | 'femenino'
+// Categoria: ver la lista y reglas de género/edad en shared/categorias.ts (CATEGORIAS)
 // Formato: 'ida' | 'idayvuelta'
 @Entity()
 export class Torneo extends BaseEntity {

@@ -13,6 +13,10 @@ import { OAuth2Client } from 'google-auth-library';
 import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
 import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
 import { procesarBajaAutomaticaSiCorresponde } from '../equipo/equipo.controler.js';
+import type { Genero } from '../shared/categorias.js';
+import { validarJugadorParaCategoria } from '../shared/categorias.js';
+
+const GENEROS_VALIDOS: Genero[] = ['femenino', 'masculino'];
 
 const em = orm.em;
 const googleClient = new OAuth2Client();
@@ -26,6 +30,7 @@ function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
     email: req.body.email,
     fechaNacimiento: req.body.fechaNacimiento,
     posicion: req.body.posicion,
+    genero: req.body.genero,
     descripcion: req.body.descripcion,
     contraseña: req.body.contraseña,
     equipo: 'equipo' in req.body ? req.body.equipo : undefined,
@@ -90,11 +95,22 @@ async function findByEmail(req: Request, res: Response) {
   }
 }
 
-/** 🔹 GET /jugadores/sin-equipo */
+/** 🔹 GET /jugadores/sin-equipo?categoria=sub15 — si viene `categoria`, además
+ * de estar libres, se filtra a los jugadores que cumplen género y edad para
+ * esa categoría (ver shared/categorias.ts). Sin `categoria`, devuelve todos
+ * los libres sin filtrar (comportamiento anterior, para no romper otros usos
+ * de este endpoint que no necesiten el filtro). */
 async function getJugadoresSinEquipo(req: Request, res: Response) {
   try {
     const jugadores = await em.find(Jugador, { equipo: null });
-    const jugadoresSeguros = jugadores.map(({ contraseña, ...resto }) => resto);
+    let resultado = jugadores;
+
+    const categoria = req.query.categoria as string | undefined;
+    if (categoria) {
+      resultado = jugadores.filter((j) => validarJugadorParaCategoria(j, categoria) === null);
+    }
+
+    const jugadoresSeguros = resultado.map(({ contraseña, ...resto }) => resto);
     res.status(200).json({ message: "found jugadores sin equipo", data: jugadoresSeguros });
   } catch (err) {
     console.error("❌ Error al obtener jugadores sin equipo:", err);
@@ -207,10 +223,15 @@ async function update(req: Request, res: Response) {
       email,
       fechaNacimiento,
       posicion,
+      genero,
       descripcion,
       equipo,
       esCapitan
     } = req.body.sanitizedInput;
+
+    if (genero !== undefined && !GENEROS_VALIDOS.includes(genero)) {
+      return res.status(400).json({ message: `Género inválido. Valores permitidos: ${GENEROS_VALIDOS.join(', ')}` });
+    }
 
     // Pre-checks fuera de la transacción (solo lecturas, sin modificar nada)
     const jugador = await em.findOne(Jugador, { id }, { populate: ['equipo'] });
@@ -224,6 +245,13 @@ async function update(req: Request, res: Response) {
     if (equipo) {
       const equipoExiste = await em.findOne(Equipo, { id: Number(equipo) });
       if (!equipoExiste) return res.status(404).json({ message: 'Equipo no encontrado' });
+
+      // Ya pertenece a este mismo equipo (no es un cambio real) — no tiene
+      // sentido re-validar género/edad contra el equipo que ya integra.
+      if (jugador.equipo?.id !== equipoExiste.id) {
+        const errorCategoria = validarJugadorParaCategoria(jugador, equipoExiste.categoria);
+        if (errorCategoria) return res.status(409).json({ message: errorCategoria });
+      }
     }
 
     // Validar capitán único: chequeamos el equipo destino (actual o nuevo)
@@ -306,6 +334,7 @@ async function update(req: Request, res: Response) {
       if (email) j.email = email;
       if (fechaNacimiento) j.fechaNacimiento = fechaNacimiento;
       if (posicion) j.posicion = posicion;
+      if (genero) j.genero = genero;
       if (descripcion !== undefined) j.descripcion = descripcion;
       if (esCapitan !== undefined) j.esCapitan = esCapitan;
 
@@ -635,7 +664,7 @@ async function login(req: Request, res: Response) {
  * Google no provee, así que el frontend los tiene que pedir en un paso corto
  * después del botón de Google y mandarlos en el mismo request. */
 async function googleLogin(req: Request, res: Response) {
-  const { credential, dni, fechaNacimiento, posicion } = req.body;
+  const { credential, dni, fechaNacimiento, posicion, genero } = req.body;
 
   if (!credential) {
     return res.status(400).json({ message: 'credential es requerido' });
@@ -675,8 +704,11 @@ async function googleLogin(req: Request, res: Response) {
       return res.json({ token });
     }
 
-    if (!dni || !fechaNacimiento || !posicion) {
-      return res.status(400).json({ message: 'Faltan dni, fechaNacimiento y posicion para completar el registro' });
+    if (!dni || !fechaNacimiento || !posicion || !genero) {
+      return res.status(400).json({ message: 'Faltan dni, fechaNacimiento, posicion y genero para completar el registro' });
+    }
+    if (!GENEROS_VALIDOS.includes(genero)) {
+      return res.status(400).json({ message: `Género inválido. Valores permitidos: ${GENEROS_VALIDOS.join(', ')}` });
     }
 
     // No hay constraint único de dni a nivel de base (ver docs/backend/pendientes.md) —
@@ -702,6 +734,7 @@ async function googleLogin(req: Request, res: Response) {
       fechaNacimiento,
       contraseña: hash,
       posicion,
+      genero,
       equipo: null,
       esCapitan: false,
     });
@@ -728,6 +761,10 @@ async function register(req: Request, res: Response) {
 
     if (!datos.email || !datos.contraseña)
       return res.status(400).json({ message: "Email y contraseña requeridos" });
+
+    if (!datos.genero || !GENEROS_VALIDOS.includes(datos.genero)) {
+      return res.status(400).json({ message: `El género es obligatorio. Valores permitidos: ${GENEROS_VALIDOS.join(', ')}` });
+    }
 
     const existeJugador = await em.findOne(Jugador, { email: datos.email });
     if (existeJugador)

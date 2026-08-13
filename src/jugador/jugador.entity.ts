@@ -27,6 +27,13 @@ export class Jugador extends BaseEntity {
   @Property({ nullable: false })
   posicion!: string;
 
+  // 'femenino' | 'masculino'. Nullable a propósito: los jugadores ya
+  // existentes antes de este campo quedan en null (no se les asigna un valor
+  // por defecto) y van a fallar cualquier validación de categoría hasta que
+  // alguien complete el dato — ver shared/categorias.ts.
+  @Property({ nullable: true })
+  genero?: string;
+
   @Property({ nullable: true })
   descripcion?: string;
 

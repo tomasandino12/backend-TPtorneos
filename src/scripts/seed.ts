@@ -10,6 +10,7 @@ import bcrypt from 'bcryptjs';
 import type { Equipo } from '../equipo/equipo.entity.js';
 import type { Jugador } from '../jugador/jugador.entity.js';
 import { orm } from '../shared/db/orm.js';
+import { CATEGORIAS_VALIDAS } from '../shared/categorias.js';
 
 // fork(): fuera de un request HTTP no hay RequestContext, y MikroORM no deja
 // usar el EntityManager global directamente en ese caso.
@@ -24,10 +25,12 @@ const em = orm.em.fork();
 let EquipoRef: typeof Equipo;
 let JugadorRef: typeof Jugador;
 
-// La categoría "sub19" pedida originalmente no existe en el sistema
-// (equipo.controler.ts solo admite sub15/sub17/mayores/veteranos/femenino);
-// se reemplazó por "sub17", la más cercana. Se ciclan estas 4 sobre los 30 equipos.
-const CATEGORIAS = ['veteranos', 'sub17', 'sub15', 'femenino'];
+// La categoría "sub19" pedida originalmente no existe en el sistema (ver
+// shared/categorias.ts); se reemplazó por "sub17", la más cercana. Antes esta
+// lista era una copia a mano que se había quedado sin "mayores" — ahora sale
+// de la fuente centralizada, así que cicla las 5 categorías reales sobre los
+// 30 equipos.
+const CATEGORIAS = CATEGORIAS_VALIDAS;
 
 const NOMBRES_EQUIPOS = [
   'Club Atlético Los Pinos', 'Deportivo San Cayetano', 'Club Social y Deportivo El Progreso',
@@ -142,7 +145,8 @@ function fechaNacimientoPara(categoria: string): string {
   if (categoria === 'sub15') { edadMin = 13; edadMax = 15; }
   else if (categoria === 'sub17') { edadMin = 16; edadMax = 17; }
   else if (categoria === 'veteranos') { edadMin = 35; edadMax = 50; }
-  else { edadMin = 18; edadMax = 35; } // femenino
+  else if (categoria === 'mayores') { edadMin = 18; edadMax = 34; }
+  else { edadMin = 18; edadMax = 35; } // femenino — sin restricción de edad, cualquier rango adulto sirve
 
   const edad = edadMin + Math.floor(Math.random() * (edadMax - edadMin + 1));
   const anioNacimiento = anioActual - edad;
