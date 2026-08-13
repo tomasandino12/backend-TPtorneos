@@ -7,6 +7,7 @@ import {
   findByEmail,
   getJugadoresSinEquipo,
   findByAdmin,
+  categoriasDisponibles,
   add,
   update,
   transferirCapitania,
@@ -28,6 +29,7 @@ jugadorRouter.get('/', findAll);
 jugadorRouter.get('/by-email', findByEmail);
 jugadorRouter.get('/sin-equipo', getJugadoresSinEquipo);
 jugadorRouter.get('/por-admin/:adminId', findByAdmin);
+jugadorRouter.get('/me/categorias-disponibles', categoriasDisponibles);
 jugadorRouter.get('/:id/suspensiones', requireRole('admin'), suspensiones);
 jugadorRouter.get('/:id', findOne);
 

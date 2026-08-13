@@ -252,6 +252,13 @@ async function add(req: Request, res: Response) {
           throw Object.assign(new Error('El jugador ya pertenece a un equipo'), { status: 400 });
         }
 
+        if (jugador) {
+          const errorCategoria = validarJugadorParaCategoria(jugador, categoria);
+          if (errorCategoria) {
+            throw Object.assign(new Error(errorCategoria), { status: 409 });
+          }
+        }
+
         const equipo = txEm.create(Equipo, { nombreEquipo, colorPrimario, colorSecundario, categoria, descripcion });
         txEm.persist(equipo);
 

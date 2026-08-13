@@ -14,7 +14,7 @@ import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
 import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
 import { procesarBajaAutomaticaSiCorresponde } from '../equipo/equipo.controler.js';
 import type { Genero } from '../shared/categorias.js';
-import { validarJugadorParaCategoria } from '../shared/categorias.js';
+import { CATEGORIAS, validarJugadorParaCategoria } from '../shared/categorias.js';
 
 const GENEROS_VALIDOS: Genero[] = ['femenino', 'masculino'];
 
@@ -152,6 +152,41 @@ async function findByAdmin(req: Request, res: Response) {
     res.status(200).json({ message: 'found jugadores por admin', data: jugadoresSeguros });
   } catch (error: any) {
     console.error('Error en findByAdmin:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** 🔹 GET /jugadores/me/categorias-disponibles — categorías compatibles con
+ * el género/edad del jugador logueado, para el selector de "Crear equipo"
+ * (Equipos.jsx). Corre la misma validarJugadorParaCategoria() que ya usan
+ * invitación/asignación a equipo, para no duplicar la regla del lado
+ * frontend. Un jugador con `genero` sin completar (dato viejo) no recibe
+ * ninguna categoría, sino un flag explícito para que el frontend le pida
+ * completar el perfil. */
+async function categoriasDisponibles(req: Request, res: Response) {
+  try {
+    if (req.user?.rol === 'admin') return res.status(403).json({ message: 'No autorizado' });
+
+    const jugador = await em.findOne(Jugador, { id: req.user?.id });
+    if (!jugador) return res.status(404).json({ message: 'Jugador no encontrado' });
+
+    if (!jugador.genero) {
+      return res.status(200).json({
+        message: 'categorias disponibles',
+        data: { categorias: [], generoIncompleto: true },
+      });
+    }
+
+    const categorias = CATEGORIAS
+      .filter((c) => validarJugadorParaCategoria(jugador, c.value) === null)
+      .map(({ value, label }) => ({ value, label }));
+
+    res.status(200).json({
+      message: 'categorias disponibles',
+      data: { categorias, generoIncompleto: false },
+    });
+  } catch (error: any) {
+    console.error('Error en categoriasDisponibles:', error);
     res.status(500).json({ message: error.message });
   }
 }
@@ -881,6 +916,7 @@ export {
   findByEmail,
   getJugadoresSinEquipo,
   findByAdmin,
+  categoriasDisponibles,
   add,
   update,
   transferirCapitania,
