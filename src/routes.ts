@@ -10,6 +10,7 @@ import { participacionRouter } from './participacion/participacion.routes.js';
 import { invitacionRouter } from './invitacion/invitacion.routes.js';
 import { notificacionRouter } from './notificacion/notificacion.routes.js';
 import { formacionRouter } from './formacion/formacion.routes.js';
+import { suspensionRouter } from './suspension/suspension.routes.js';
 
 export const apiRouter = Router();
 
@@ -25,5 +26,6 @@ apiRouter.use('/participacion', participacionRouter);
 apiRouter.use('/invitaciones', invitacionRouter);
 apiRouter.use('/notificaciones', notificacionRouter);
 apiRouter.use('/formaciones', formacionRouter);
+apiRouter.use('/suspensiones', suspensionRouter);
 
 

@@ -571,7 +571,12 @@ async function habilitar(req: Request, res: Response) {
   }
 }
 
-/** 🔹 GET /jugadores/:id/suspensiones — historial + torneo activo actual */
+/** 🔹 GET /jugadores/:id/suspensiones — historial + torneo activo actual
+ * Solo admin. Restringido a lo que le corresponde a SU propio historial: el jugador
+ * debe pertenecer hoy a un equipo que participa en algún torneo de este admin, o
+ * tener al menos una Suspension en un torneo de este admin (para no ocultar historial
+ * de jugadores que ya se fueron del equipo). El historial devuelto se filtra a solo
+ * los torneos de este admin, para no exponer motivos/torneos de otros admins. */
 async function suspensiones(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -580,22 +585,32 @@ async function suspensiones(req: Request, res: Response) {
     const jugador = await em.findOne(Jugador, { id }, { populate: ['equipo'] });
     if (!jugador) return res.status(404).json({ message: 'Jugador no encontrado' });
 
-    const historial = await em.find(
+    const adminId = req.user?.id;
+
+    const historialCompleto = await em.find(
       Suspension,
       { jugador: id },
-      { populate: ['torneo'], orderBy: { fecha: 'DESC' } }
+      { populate: ['torneo', 'torneo.adminTorneo'], orderBy: { fecha: 'DESC' } }
     );
+    const historial = historialCompleto.filter((s) => s.torneo.adminTorneo?.id === adminId);
+
+    const tieneParticipacionEnAdmin = jugador.equipo
+      ? await em.count(Participacion, { equipo: jugador.equipo.id, torneo: { adminTorneo: adminId } })
+      : 0;
+
+    if (!tieneParticipacionEnAdmin && historial.length === 0) {
+      return res.status(403).json({ message: 'No autorizado para ver el historial de este jugador' });
+    }
 
     const participacionActiva = await resolverParticipacionActiva(jugador);
+    const torneoActivo =
+      participacionActiva && participacionActiva.torneo.adminTorneo?.id === adminId
+        ? { id: participacionActiva.torneo.id, nombreTorneo: participacionActiva.torneo.nombreTorneo }
+        : null;
 
     res.status(200).json({
       message: 'found suspensiones',
-      data: {
-        suspensiones: historial,
-        torneoActivo: participacionActiva
-          ? { id: participacionActiva.torneo.id, nombreTorneo: participacionActiva.torneo.nombreTorneo }
-          : null,
-      },
+      data: { suspensiones: historial, torneoActivo },
     });
   } catch (error: any) {
     console.error('Error en suspensiones:', error);

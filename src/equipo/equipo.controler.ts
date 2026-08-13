@@ -8,7 +8,7 @@ import { Participacion } from '../participacion/participacion.entity.js';
 import { Partido } from '../partido/partido.entity.js';
 import { Suspension } from '../suspension/suspension.entity.js';
 import { MIN_JUGADORES_PLANTEL_TORNEO } from '../shared/constants.js';
-import { CATEGORIAS_VALIDAS, validarJugadorParaCategoria } from '../shared/categorias.js';
+import { CATEGORIAS_VALIDAS, validarJugadorParaCategoria, obtenerReglaCategoria } from '../shared/categorias.js';
 
 const em = orm.em;
 
@@ -30,6 +30,29 @@ async function verificarCapitanDueño(
     return { status: 403, message: 'Solo el capitán del equipo puede realizar esta acción' };
   }
   return null;
+}
+
+/** No puede haber dos equipos con el mismo nombre (insensible a mayúsculas y
+ * a espacios al principio/final) dentro de la misma categoría — entre
+ * categorías distintas el mismo nombre no es problema. `excluirId` es el
+ * propio equipo al editar, para no bloquearlo consigo mismo. */
+async function existeNombreDuplicadoEnCategoria(
+  txEm: typeof em,
+  nombreEquipo: string,
+  categoria: string,
+  excluirId?: number
+): Promise<boolean> {
+  const nombreNormalizado = nombreEquipo.trim().toLowerCase();
+  const candidatos = await txEm.find(Equipo, {
+    categoria,
+    ...(excluirId !== undefined ? { id: { $ne: excluirId } } : {}),
+  });
+  return candidatos.some((e) => e.nombreEquipo.trim().toLowerCase() === nombreNormalizado);
+}
+
+function mensajeNombreDuplicado(nombreEquipo: string, categoria: string): string {
+  const label = obtenerReglaCategoria(categoria)?.label ?? categoria;
+  return `Ya existe un equipo llamado "${nombreEquipo.trim()}" en la categoría ${label}.`;
 }
 
 /** Baja automática: si el plantel de un equipo cae por debajo de
@@ -219,6 +242,10 @@ async function add(req: Request, res: Response) {
     // tiene equipo" falla, el rollback evita que quede un Equipo huérfano
     // (sin capitán ni jugadores) persistido en la base.
     const nuevoEquipo = await em.transactional(async (txEm) => {
+      if (await existeNombreDuplicadoEnCategoria(txEm, nombreEquipo, categoria)) {
+        throw Object.assign(new Error(mensajeNombreDuplicado(nombreEquipo, categoria)), { status: 409 });
+      }
+
       if (req.user?.rol !== 'admin') {
         const jugador = await txEm.findOne(Jugador, { id: req.user?.id });
         if (jugador?.equipo) {
@@ -259,6 +286,14 @@ async function update(req: Request, res: Response) {
 
     const errorAuth = await verificarCapitanDueño(id, req, em);
     if (errorAuth) return res.status(errorAuth.status).json({ message: errorAuth.message });
+
+    const nombreNuevo: string | undefined = req.body.sanitizedInput.nombreEquipo;
+    if (nombreNuevo !== undefined) {
+      const categoriaEfectiva: string = req.body.sanitizedInput.categoria ?? equipoToUpdate.categoria;
+      if (await existeNombreDuplicadoEnCategoria(em, nombreNuevo, categoriaEfectiva, id)) {
+        return res.status(409).json({ message: mensajeNombreDuplicado(nombreNuevo, categoriaEfectiva) });
+      }
+    }
 
     em.assign(equipoToUpdate, req.body.sanitizedInput);
     await em.flush();
