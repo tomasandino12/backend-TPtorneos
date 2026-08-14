@@ -1,18 +1,89 @@
-Casi todo fue modificado luego de consulta del 6/8, los archivos dentro de src tienen que ser .ts y los del dist pueden tener .js o .js.map.  y ahora toda la parte de configuracion esta dentro de la carpeta Backend q guarda todo el proyecto
+# Gestor de Torneos — Backend
 
-CONSEJOS Y DATOS:
-Si algo no funciona puede ser buena idea borrar la carpeta dist, solo con pnpm start:dev se vuelve a lanzar y por ahi arregla algun archivo viejo q daba errores
+API REST para la gestión de torneos de fútbol amateur: jugadores, equipos, árbitros, canchas, torneos, fixtures y resultados. Backend del TP de Desarrollo de Software (UTN FRRo) — el frontend vive en un repositorio aparte, [`frontend-TPtorneos`](https://github.com/tomasandino12/frontend-TPtorneos).
 
-Tambien podemos borrar node_modules y lo volvemos a generar con pnpm install
+Documentación completa del proyecto (arquitectura, entidades, endpoints, decisiones técnicas): **[`docs/README.md`](./docs/README.md)**.
 
-Si tienen docker desktop tocando los 3 puntos del contenedor y copiando la docker run y pegandola en algun lado tiene data de el usuario la contraseña, el nombre de la pase de datos y si pone -p 3307:3306 significa que para la conexion usa el puerto fisico 3307 de tu compu pero usa el puerto 3306 virtual de docker
+## Stack
 
-No seguir haciendo la crud con los videos de SQL pasar directo a MicroORM, los videos eran para entender la logica por debajo de las consultas que MicroORM hace, este creara las tablas y hara las consultas para dejar esa crud con persistencia como pedian en la entrega
+Node.js + TypeScript · Express 5 · MikroORM 5 (MySQL) · JWT + bcryptjs · Vitest + Supertest.
 
-Le cambie el nombre a cancha.entity que hizo Gero a cancha.entity.mem porque el profe me dijo que cuando arranquemos con MicroORM vamos a decirle que arme las tablas diciendole donde encontrar los archivos que describan la entidad y que lo va a confundir tener 2 archivos que terminen en entity.ts por lo cual cambie el de Gero para poder probar eso luego cuando vea los videos.
-Igualmente no entendi como haria luego MicroORM para tener varias entidades y manejarlas en simultaneo. 
-CUALQUIER DUDA SACAR CONSULTA VIRTUAL EN VEZ DE HACERSE LIO, LITERALMENTE EN 20 MINUTOS LO RESUELVEN CON EL PROFE
+## Requisitos previos
 
+- Node.js 18 o superior.
+- pnpm (`corepack enable` o `npm install -g pnpm`). El proyecto usa `pnpm-lock.yaml` — no instalar con `npm install`, genera un lockfile paralelo y puede instalar versiones distintas.
+- Una base de datos MySQL accesible (local con Docker, o en la nube — ver más abajo). No hace falta crear las tablas a mano: el proyecto las genera y actualiza solo al arrancar.
 
-11/8 
-Luego de ver los primeros videos de MikroORM hice la actualizacion de controler, entity y routes de canchas. Tambien cree la CRUD partidos para poder probar las relaciones de MikroORM y como funcionan (en este caso probe la relacion de cancha y partidos que es de 1..n). 
+## Instalación
+
+```bash
+pnpm install
+cp .env.example .env
+```
+
+Completar `.env` con los valores reales (ver la sección siguiente). Con una base MySQL local corriendo:
+
+```bash
+pnpm build       # compila TypeScript a dist/
+pnpm start:dev   # levanta el servidor en modo desarrollo (recompila en cada cambio)
+```
+
+El servidor queda escuchando en `http://localhost:3000` (o el puerto que indique `PORT` en `.env`), con todas las rutas de dominio bajo el prefijo `/api` (por ejemplo, `http://localhost:3000/api/jugadores`).
+
+No hay un script `dev` a secas ni `start` simple para desarrollo — el único modo de desarrollo es `pnpm start:dev`. `pnpm start` corre el build ya compilado (`node ./dist/app.js`), pensado para producción.
+
+## Variables de entorno
+
+Copiar `.env.example` a `.env` y completar:
+
+| Variable | Para qué |
+|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Conexión a MySQL. En desarrollo local con Docker suele ser `localhost:3306`, usuario/contraseña `dsw`/`dsw`. |
+| `DB_SSL` | `true` para bases en la nube que exigen TLS (ej. Aiven, que requiere `ssl-mode=REQUIRED`). `false` en local. |
+| `JWT_SECRET` | Clave para firmar y verificar los JWT de sesión. Usar una cadena larga y aleatoria (`openssl rand -hex 32`). |
+| `GOOGLE_CLIENT_ID` | Client ID de Google Cloud, para verificar el login con Google (`POST /jugadores/google-login`). No hace falta el Client Secret. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Envío del mail de recuperación de contraseña, vía Gmail SMTP (`SMTP_PASS` es un "App Password" de Google, no la contraseña normal de la cuenta). |
+| `FRONTEND_URL` | URL del frontend, usada para armar el link del mail de recuperación de contraseña. |
+
+Si `.env` no está configurado, el proyecto igual arranca (`DB_*` cae a valores de desarrollo local, `JWT_SECRET` a una clave hardcodeada) — pensado para no bloquear una entrega académica, pero **no usar esos fallbacks fuera de desarrollo local**.
+
+Para correr los tests automatizados hace falta además un `.env.test` (ver más abajo).
+
+## Base de datos
+
+El proyecto no usa migraciones manuales: al arrancar (`app.ts`), MikroORM compara las entidades del código contra las tablas reales y aplica los `CREATE TABLE`/`ALTER TABLE` necesarios (`syncSchema()`, ver [`docs/backend/glosario.md`](./docs/backend/glosario.md)). No hace falta correr ningún script de setup de esquema.
+
+## Tests
+
+```bash
+pnpm test         # corre toda la suite una vez (Vitest)
+pnpm test:watch   # modo watch
+```
+
+Los tests de integración pegan contra una base de datos real y separada de la de desarrollo (`gestordetorneos_test`, configurada en `.env.test`, ya incluido en el repo sin secretos reales), para no ensuciar datos de desarrollo. Antes de correrlos por primera vez, crear esa base en MySQL:
+
+```sql
+CREATE DATABASE gestordetorneos_test;
+GRANT ALL PRIVILEGES ON gestordetorneos_test.* TO 'dsw'@'localhost';
+```
+
+(ajustar el usuario si `.env.test` usa uno distinto).
+
+## Deploy
+
+Backend deployado en Render, conectado a una base MySQL en Aiven (variables `DB_SSL=true`). Frontend: [`frontend-gestortorneos.vercel.app`](https://frontend-gestortorneos.vercel.app/).
+
+### Credenciales de prueba
+
+Para evaluar la app deployada, sin necesidad de registrar una cuenta nueva:
+
+| Rol | Email | Contraseña |
+|---|---|---|
+| Administrador | `adrianperez@gmail.com` | `adrianperez123` |
+| Jugador | `julianalvarez@gmail.com` | `julianalvarez123` |
+
+Son cuentas de prueba — no representan personas reales.
+
+## Estructura del proyecto
+
+Arquitectura por capas (`*.routes.ts` → `*.controler.ts` → `*.entity.ts`), un módulo por entidad de dominio bajo `src/`. Detalle completo, con diagrama y la responsabilidad exacta de cada capa, en [`docs/backend/README.md`](./docs/backend/README.md).

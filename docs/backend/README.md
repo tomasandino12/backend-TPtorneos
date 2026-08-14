@@ -11,6 +11,7 @@ Mismo criterio que `docs/frontend/` del repo del frontend (carpeta hermana de es
 - [`glosario.md`](./glosario.md) — explicación en criollo de los conceptos técnicos no triviales (MikroORM, `syncSchema`, arquitectura por capas, JWT, transacciones, etc.), cada uno con el ejemplo real de este proyecto.
 - [`decisiones.md`](./decisiones.md) — bitácora de por qué se tomó cada decisión de arquitectura relevante.
 - [`pendientes.md`](./pendientes.md) — lo que queda frágil o sin resolver, con el motivo concreto.
+- [`bitacora.md`](./bitacora.md) — notas informales de los primeros días de desarrollo (aprendizaje de MikroORM).
 
 ## Visión general de la arquitectura
 
@@ -88,15 +89,17 @@ Si `JWT_SECRET` no está definida, el código cae a un valor hardcodeado (`'clav
 
 ### Conexión a MySQL y `syncSchema()`
 
-La conexión está hardcodeada en `src/shared/db/orm.ts` (no usa variables de entorno para la base, a diferencia del resto de la configuración):
+La conexión se arma en `src/shared/db/orm.ts` a partir de variables de entorno (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`), con fallback a valores de desarrollo local si no están seteadas:
 
 ```ts
-dbName: 'gestordetorneos',
-type: 'mysql',
-clientUrl: 'mysql://dsw:dsw@localhost:3306/gestordetorneos',
+const DB_HOST = process.env.DB_HOST || 'localhost';
+const DB_USER = process.env.DB_USER || 'dsw';
+const DB_PASSWORD = process.env.DB_PASSWORD || 'dsw';
+const DB_NAME = process.env.DB_NAME || 'gestordetorneos';
+const DB_SSL = process.env.DB_SSL === 'true';
 ```
 
-Esto asume una base MySQL local llamada `gestordetorneos`, usuario `dsw`, contraseña `dsw`, puerto `3306` — típicamente levantada con Docker en desarrollo (ver comentarios de instalación más abajo).
+En desarrollo local (sin `DB_*` seteadas) asume una base MySQL llamada `gestordetorneos`, usuario/contraseña `dsw`/`dsw`, puerto `3306` — típicamente levantada con Docker (ver comentarios de instalación más abajo). `DB_SSL=true` habilita TLS sin validar el certificado del servidor (`rejectUnauthorized: false`), necesario para bases en la nube que lo exigen (ej. Aiven, `ssl-mode=REQUIRED`) — así es como corre el deploy real del proyecto en producción.
 
 El proyecto **no usa migraciones manuales**. En cada arranque (`app.ts`), después de montar las rutas, se llama a:
 

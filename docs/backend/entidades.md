@@ -30,6 +30,7 @@ Representa a una persona que juega al fútbol amateur y usa la app — se regist
 | `fechaNacimiento` | `string` | Se guarda como texto (`'2003-09-25'`), no como `Date` — a diferencia de `fecha_partido`/`fechaInicio` en otras entidades, que sí son `Date`. |
 | `contraseña` | `string` | Hasheada con bcrypt antes de guardar (`add`/`register` en `jugador.controler.ts`). |
 | `posicion` | `string` | Texto libre en la entidad, pero en la práctica el proyecto solo usa 4 valores: `'Arquero'`, `'Defensor'`, `'Mediocampista'`, `'Delantero'` (ver `scripts/seed.ts` y la lógica de `/formaciones`, que depende de que sea exactamente uno de esos 4 para poder categorizar jugadores). No hay una validación server-side que lo restrinja a esos 4 valores en `add`/`update` de jugador — ver `pendientes.md`. |
+| `genero` | `string?` | `'femenino' \| 'masculino'` (`Genero`, ver `shared/categorias.ts`). **Opcional a nivel de entidad/base** (`nullable: true` — jugadores creados antes de agregar este campo pueden tener `null`), pero **obligatorio en `POST /jugadores/registro`** (`register()` en `jugador.controler.ts` lo rechaza con `400` si falta o no es uno de los dos valores válidos). Se usa para validar si el jugador puede integrar un equipo de una categoría dada (`validarJugadorParaCategoria`), junto con la edad calculada a partir de `fechaNacimiento`. |
 | `descripcion` | `string?` | Texto libre, opcional. Columna `varchar(255)` — ver `pendientes.md`, mismo patrón que el bug que se corrigió en `Formacion.notas`. |
 | `esCapitan` | `boolean` | Default `false`. Como mucho un jugador por equipo puede tener esto en `true` — no hay una restricción a nivel de base de datos para eso, se valida en código (`jugador.controler.ts`, función `update`, y en la creación de equipo). |
 | `equipo` | `Equipo \| null` | `@ManyToOne('Equipo', { nullable: true })`. `null` significa "sin equipo". |
@@ -43,7 +44,7 @@ Representa un equipo amateur — el agrupador de jugadores que participa en torn
 |---|---|---|
 | `nombreEquipo`, `colorPrimario` | `string` | Obligatorios. |
 | `colorSecundario` | `string?` | Opcional. |
-| `categoria` | `string` | Default `'veteranos'`. Valores válidos (impuestos en `sanitizeEquipoInput`, no en la entidad): `sub15`, `sub17`, `mayores`, `veteranos`, `femenino`. |
+| `categoria` | `string` | Default `'veteranos'`. Valores válidos y sus reglas de género/edad centralizados en `shared/categorias.ts` (`CATEGORIAS`/`CATEGORIAS_VALIDAS`, no en la entidad): `sub15`, `sub17`, `mayores`, `veteranos`, `femenino` — cada una con un género exigido y/o un rango de edad (ver `validarJugadorParaCategoria`). **Actualizado**: antes esta lista vivía duplicada en `equipo.controler.ts`/`torneo.controler.ts`/`scripts/seed.ts`; ahora todos importan de acá. |
 | `descripcion` | `string?` | Igual que en `Jugador`: `varchar(255)`, sin tipo `text` — ver `pendientes.md`. |
 | `escudoUrl` | `string?` | Ruta relativa al archivo subido (`/uploads/escudos/escudo-<id>-<timestamp>.jpg`), no la imagen en sí. |
 | `jugadores` | `Collection<Jugador>` | `@OneToMany('Jugador', 'equipo')` — el plantel completo. El límite de 26 jugadores (`MAX_JUGADORES_PLANTEL`) está en `invitacion.controler.ts`, no en la entidad. |
@@ -138,7 +139,7 @@ Representa que un jugador fue suspendido de un torneo puntual (no de la platafor
 | `activa` | `boolean` | Default `true`. Se pasa a `false` al levantar la suspensión (`habilitar`), no se borra el registro — queda como historial. |
 | `fechaLevantamiento` | `Date?` | Se completa recién al levantar la suspensión. |
 
-No hay un `suspension.routes.ts`/`suspension.controler.ts` propio — toda la lógica de crear/levantar una suspensión vive dentro de `jugador.controler.ts` (funciones `suspender`/`habilitar`/`suspensiones`, montadas en `jugadorRouter` bajo `/jugadores/:id/...`), no en su propio módulo de rutas.
+**Actualizado**: crear (`suspender`) y levantar (`habilitar`) una suspensión sigue viviendo en `jugador.controler.ts`, montado en `jugadorRouter` bajo `/jugadores/:id/...` (el dato anterior de esta página, que sí era así). Pero **ya existe un `suspension.routes.ts`/`suspension.controler.ts` propio**, montado en `/suspensiones`, para *gestionar* las suspensiones ya creadas desde el panel de admin: `GET /suspensiones` (todas las de los torneos del admin logueado, con filtros `?activa=`/`?jugador=`) y `DELETE /suspensiones/:id` (borrado definitivo, verifica que el torneo sea del admin logueado). Ver `endpoints.md`.
 
 ## `Invitacion`
 

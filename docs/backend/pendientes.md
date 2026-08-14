@@ -42,20 +42,28 @@ Los 20 casos de esta corrección (positivos y negativos) se probaron en vivo con
 
 **Por qué queda pendiente**: ninguna de las dos cosas rompe funcionalidad — son inconsistencias de estilo que alguien nuevo en el proyecto nota al leer varios módulos seguidos, y que unificar implicaría tocar rutas/columnas ya en uso (con el costo de coordinar el cambio con el frontend), no un ajuste de una línea.
 
-## 5. No hay tests automatizados
+## 5. ~~No hay tests automatizados~~ — resuelto
 
-**Dónde**: todo el proyecto. La única forma de probar un endpoint es manualmente, con los archivos `.http` de cada módulo (`jugador.http`, `equipo.http`, `formacion.http`, `notificacion.http` — no todos los módulos tienen uno) o con herramientas externas (curl, Postman, REST Client de VS Code).
+**Actualizado**: ya no es así. Hoy hay 8 archivos `*.test.ts` con 30 casos (`it`) en total — 3 unitarios puros (middlewares de sanitización y funciones puras como `generarRondas`/`elegirReemplazoMenosCargado`) y 5 de integración real, con Supertest contra la `app` de Express y una base de datos de test separada (`gestordetorneos_test`, configurada en `.env.test`). Corren con `pnpm test`. Se deja el ítem tachado en vez de borrarlo para que quede visible que la afirmación original ya no aplica.
 
-**Por qué queda pendiente**: es coherente con el alcance académico del proyecto hasta ahora — cada feature nueva (y cada corrección de seguridad, como la de esta sesión) se verificó manualmente contra la base real en el momento de construirla, pero no queda ninguna prueba automatizada corriendo en el repo que detecte una regresión futura sin repetir esa verificación manual a mano.
+## 6. ~~Credenciales de base de datos hardcodeadas en `orm.ts`~~ — resuelto
 
-## 6. Credenciales de base de datos hardcodeadas en `orm.ts`
-
-**Dónde**: `src/shared/db/orm.ts` — `clientUrl: 'mysql://dsw:dsw@localhost:3306/gestordetorneos'`, `dbName: 'gestordetorneos'`.
-
-**Por qué queda pendiente**: a diferencia del resto de la configuración sensible del proyecto (`JWT_SECRET`, credenciales SMTP), que sí vive en variables de entorno (`.env`, ver `README.md`), la conexión a MySQL está escrita directamente en el código fuente. Funciona para el entorno de desarrollo local de este proyecto (una base Docker con usuario/contraseña `dsw`/`dsw`), pero si el proyecto necesitara correr contra una base con otras credenciales (otro entorno, otra máquina), hay que editar este archivo a mano en vez de cambiar una variable de entorno.
+**Actualizado**: ya no es así. `src/shared/db/orm.ts` lee `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` de `process.env`, con fallback a los valores de desarrollo local (`dsw`/`dsw`/`localhost:3306`/`gestordetorneos`) solo si esas variables no están seteadas — agregado para poder conectar a una base en la nube (Aiven, que exige `DB_SSL=true`) sin tocar código. Se deja el ítem tachado por el mismo motivo que el de arriba.
 
 ## 7. `JWT_SECRET` tiene un valor de reserva hardcodeado en el código
 
 **Dónde**: se repite literalmente en cada lugar que firma o verifica un token — `auth.middleware.ts`, `jugador.controler.ts` (login, registro), `adminTorneo.controler.ts` (login) — todos con `process.env.JWT_SECRET || 'clave-segura-del-gestor-torneos-2024'`.
 
 **Por qué queda pendiente**: si `.env` no está configurado, el proyecto arranca igual y funciona (conveniente para una entrega académica sin fricción de setup), pero firma y verifica todos los tokens con una clave conocida y pública (está en el propio código fuente del repo). Cualquiera que lea el código podría fabricar un JWT válido para cualquier usuario sin necesitar la base ni ninguna contraseña, si el proyecto llegara a correr en algún entorno sin `JWT_SECRET` seteada de verdad.
+
+## 8. CRUD de `Partido` sin protección de rol — el hallazgo de seguridad más importante hoy
+
+**Dónde**: `src/partido/partido.routes.ts` — `POST /`, `PUT`/`PATCH /:id` y `DELETE /:id` no tienen `requireRole` ni ningún chequeo de ownership, a diferencia de `PATCH /:id/resultado` y `PATCH /:id/programacion` (ambos protegidos, exigen ser el admin dueño del torneo).
+
+**Por qué es grave**: cualquier usuario autenticado — incluso un `jugador` sin ningún vínculo con el partido — puede crear, editar o borrar cualquier partido de cualquier torneo. Es el único CRUD del proyecto que quedó completamente abierto (el resto de los recursos administrables usan `requireRole('admin')` de forma consistente). Corregirlo implica agregar `requireRole('admin')` a las 3 rutas y, siguiendo el patrón ya usado en `torneo.controler.ts` (`verificarAdminDueño`) o en `actualizarResultado`/`actualizarProgramacion` de este mismo archivo, verificar que quien llama sea el admin dueño del torneo del partido.
+
+## 9. `participacion.controler.ts` sin ownership por torneo
+
+**Dónde**: `update`/`remove` en `src/participacion/participacion.controler.ts`, montadas con `requireRole('admin')` en `participacion.routes.ts`.
+
+**Por qué es frágil**: exigen rol `admin` genérico pero no verifican que sea el admin dueño del torneo de esa participación puntual — cualquier `AdminTorneo` puede editar o borrar la inscripción de un equipo en el torneo de otro admin. Mismo patrón que ya resuelve `torneo.controler.ts` con `verificarAdminDueño`, todavía no aplicado acá.

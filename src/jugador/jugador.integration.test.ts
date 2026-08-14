@@ -30,6 +30,7 @@ describe('Flujo de integración: registro -> login -> perfil protegido', () => {
         dni: `${Date.now()}`.slice(-8),
         email,
         fechaNacimiento: '2000-01-01',
+        genero: 'masculino',
         posicion: 'Delantero',
         contraseña,
       });
