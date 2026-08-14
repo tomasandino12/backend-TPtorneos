@@ -18,7 +18,9 @@ Las respuestas de éxito, salvo que se aclare lo contrario, tienen la forma `{ m
 | GET | `/por-admin/:adminId` | cualquier autenticado | — | `200` jugadores de equipos que participan en torneos de ese admin | — |
 | GET | `/:id/suspensiones` | cualquier autenticado | — | `200` `{ suspensiones: [...], torneoActivo }` | `404` jugador no encontrado |
 | GET | `/:id` | cualquier autenticado | — | `200` | `404` |
-| POST | `/` | cualquier autenticado | `{ nombre, apellido, dni, email, fechaNacimiento, contraseña, posicion, equipo?, esCapitan? }` | `201` | `400` faltan campos · `409` email en uso |
+| POST | `/` | cualquier autenticado | `{ nombre, apellido, dni, email, fechaNacimiento, contraseña, posicion, genero?, equipo?, esCapitan? }` | `201` | `400` faltan campos · `409` email en uso |
+
+**Hallazgo pendiente**: a diferencia de `register()`, `update()` y `responder()` de invitación, este `add()` **no** valida `genero` contra `GENEROS_VALIDOS` ni corre `validarJugadorParaCategoria` cuando `equipo` viene seteado en el body — se puede dar de alta un jugador con género inválido/ausente y asignarlo directo a un equipo de una categoría que no le corresponde. Ver `pendientes.md`.
 | PATCH | `/:id/transferir-capitania` | JWT: `:id` debe ser el propio usuario logueado (además de ser capitán) | `{ idNuevoCapitan }` | `200` `{ idSaliente, idNuevoCapitan }` | `403` `:id` no coincide con `req.user.id` · `403` no es capitán · `404` nuevo capitán no existe · `400` mismo jugador / equipo distinto |
 | PATCH | `/:id/expulsar` | JWT: capitán del equipo del jugador `:id` | `{ motivo }` (mín. 5 caracteres) | `200` `{ idJugador, idEquipo, motivo }` | `403` no-capitán · `404` jugador no encontrado · `403` capitán de otro equipo · `400` auto-expulsión · `400` motivo inválido |
 | PATCH | `/:id/suspender` | JWT: admin dueño del torneo activo del equipo de `:id` | `{ motivo }` | `201` `Suspension` creada | `400` motivo vacío · `404` jugador no encontrado · `400` sin torneo activo · `403` admin de otro torneo · `409` ya suspendido |

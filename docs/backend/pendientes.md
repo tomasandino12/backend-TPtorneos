@@ -67,3 +67,9 @@ Los 20 casos de esta corrección (positivos y negativos) se probaron en vivo con
 **Dónde**: `update`/`remove` en `src/participacion/participacion.controler.ts`, montadas con `requireRole('admin')` en `participacion.routes.ts`.
 
 **Por qué es frágil**: exigen rol `admin` genérico pero no verifican que sea el admin dueño del torneo de esa participación puntual — cualquier `AdminTorneo` puede editar o borrar la inscripción de un equipo en el torneo de otro admin. Mismo patrón que ya resuelve `torneo.controler.ts` con `verificarAdminDueño`, todavía no aplicado acá.
+
+## 10. `POST /jugadores` no valida género ni categoría al asignar equipo en el alta
+
+**Dónde**: `add()` en `src/jugador/jugador.controler.ts` (líneas ~194-243).
+
+**Por qué es frágil**: cuando el body trae `equipo` seteado, `add()` sí valida cupo máximo de plantel y capitán único, pero a diferencia de los otros 3 lugares que tocan esta misma regla (`register()`, `update()` de jugador, y `responder()` de invitación), **no** valida `genero` contra `GENEROS_VALIDOS` ni corre `validarJugadorParaCategoria` (`shared/categorias.ts`) contra la categoría del equipo. Se puede dar de alta un jugador con género inválido o ausente y asignarlo directo a un equipo de una categoría que no le corresponde por género/edad, salteando una regla que en el resto del sistema se respeta de forma consistente. Encontrado en la auditoría del 13/08 al pull que agregó `genero`/`shared/categorias.ts` — no es un bug introducido a propósito, es un lugar que quedó afuera cuando se agregó la regla en los demás.
