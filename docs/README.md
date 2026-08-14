@@ -12,6 +12,7 @@ Punto de entrada a toda la documentación del backend. Ver también la documenta
 - [`backend/decisiones.md`](./backend/decisiones.md) — por qué se tomó cada decisión de arquitectura relevante.
 - [`backend/pendientes.md`](./backend/pendientes.md) — lo que queda frágil o sin resolver, con el motivo concreto.
 - [`backend/bitacora.md`](./backend/bitacora.md) — notas informales de los primeros días de desarrollo (aprendizaje de MikroORM).
+- [`evidencia-tests.md`](./evidencia-tests.md) — salida real de la suite de tests, para la entrega de Aprobación Directa.
 
 ## Instalación y ejecución
 

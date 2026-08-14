@@ -9,9 +9,14 @@ const em = orm.em;
 /** Formatea una fecha como DD/MM/AAAA para mensajes de error legibles. */
 function formatFecha(fecha: Date): string {
   const d = new Date(fecha);
-  const dia = String(d.getDate()).padStart(2, '0');
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dia}/${mes}/${d.getFullYear()}`;
+  // getUTCDate/getUTCMonth/getUTCFullYear, no getDate/getMonth/getFullYear:
+  // las fechas de torneo/participación se guardan como medianoche UTC, y con
+  // los getters en hora local esto retrocedía un día en cualquier entorno con
+  // huso horario negativo respecto a UTC (bug real, detectado porque hacía
+  // fallar un test de integración con la fecha "un día antes" de la esperada).
+  const dia = String(d.getUTCDate()).padStart(2, '0');
+  const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dia}/${mes}/${d.getUTCFullYear()}`;
 }
 
 /** Dos torneos se superponen si el inicio de cada uno cae antes (o el mismo

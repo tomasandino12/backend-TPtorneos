@@ -69,6 +69,8 @@ GRANT ALL PRIVILEGES ON gestordetorneos_test.* TO 'dsw'@'localhost';
 
 (ajustar el usuario si `.env.test` usa uno distinto).
 
+Evidencia real de una corrida completa (8 archivos, 30 tests, 100% en verde): [`docs/evidencia-tests.md`](./docs/evidencia-tests.md).
+
 ## Deploy
 
 Backend deployado en Render, conectado a una base MySQL en Aiven (variables `DB_SSL=true`). Frontend: [`frontend-gestortorneos.vercel.app`](https://frontend-gestortorneos.vercel.app/).

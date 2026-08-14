@@ -8,9 +8,12 @@ const em = orm.em;
  * mismo formato que participacion.controler.ts. */
 function formatFecha(fecha: Date): string {
   const d = new Date(fecha);
-  const dia = String(d.getDate()).padStart(2, '0');
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dia}/${mes}/${d.getFullYear()}`;
+  // Ver el comentario equivalente en participacion.controler.ts: getUTC* en
+  // vez de los getters locales, para no retroceder un día en husos horarios
+  // negativos respecto a UTC.
+  const dia = String(d.getUTCDate()).padStart(2, '0');
+  const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dia}/${mes}/${d.getUTCFullYear()}`;
 }
 
 /** Combina la parte de fecha de `fecha` con la hora de `hora` ("HH:MM" o
