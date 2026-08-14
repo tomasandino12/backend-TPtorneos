@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { orm } from '../shared/db/orm.js';
 import { Partido } from './partido.entity.js';
+import { Torneo } from '../torneo/torneo.entity.js';
 
 const em = orm.em;
 
@@ -74,17 +75,29 @@ async function findOne(req: Request, res: Response) {
   }
 }
 
-/** POST /partidos */
+/** POST /partidos — igual que el resto de las escrituras de este módulo,
+ * exige ser el admin dueño del torneo al que se le quiere agregar el partido
+ * (mismo patrón que actualizarResultado/actualizarProgramacion, más abajo).
+ * En la práctica los partidos se crean casi siempre vía generarFixture
+ * (torneo.controler.ts), pero este endpoint genérico queda expuesto para
+ * casos puntuales y necesitaba la misma protección que el resto del CRUD. */
 async function add(req: Request, res: Response) {
   try {
     const data = { ...req.body.sanitizedInput };
 
     if (!data.torneo || !data.local || !data.visitante || !data.fecha_partido) {
-      return res.status(400).json({ error: 'Faltan campos requeridos: torneo, local, visitante, fecha_partido' });
+      return res.status(400).json({ message: 'Faltan campos requeridos: torneo, local, visitante, fecha_partido' });
     }
 
     if (data.local === data.visitante) {
-      return res.status(400).json({ error: 'El equipo local y visitante no pueden ser el mismo' });
+      return res.status(400).json({ message: 'El equipo local y visitante no pueden ser el mismo' });
+    }
+
+    const torneo = await em.findOne(Torneo, { id: Number(data.torneo) }, { populate: ['adminTorneo'] });
+    if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    if (req.user?.rol !== 'admin' || torneo.adminTorneo?.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No sos el administrador dueño de este torneo' });
     }
 
     const partido = em.create(Partido, data);
@@ -96,14 +109,20 @@ async function add(req: Request, res: Response) {
   }
 }
 
-/** PUT /partidos/:id */
+/** PUT /partidos/:id — antes sin ninguna protección: cualquier autenticado
+ * podía editar cualquier partido de cualquier torneo. Mismo chequeo de
+ * ownership que actualizarResultado/actualizarProgramacion. */
 async function update(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const partidoToUpdate = await em.findOne(Partido, { id });
+    const partidoToUpdate = await em.findOne(Partido, { id }, { populate: ['torneo.adminTorneo'] });
     if (!partidoToUpdate) return res.status(404).json({ message: 'partido not found' });
+
+    if (req.user?.rol !== 'admin' || partidoToUpdate.torneo.adminTorneo?.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No sos el administrador dueño de este torneo' });
+    }
 
     const data = { ...req.body.sanitizedInput };
     em.assign(partidoToUpdate, data);
@@ -115,14 +134,18 @@ async function update(req: Request, res: Response) {
   }
 }
 
-/** DELETE /partidos/:id */
+/** DELETE /partidos/:id — mismo hueco que update(), mismo fix. */
 async function remove(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const partido = await em.findOne(Partido, { id });
+    const partido = await em.findOne(Partido, { id }, { populate: ['torneo.adminTorneo'] });
     if (!partido) return res.status(404).json({ message: 'partido not found' });
+
+    if (req.user?.rol !== 'admin' || partido.torneo.adminTorneo?.id !== req.user?.id) {
+      return res.status(403).json({ message: 'No sos el administrador dueño de este torneo' });
+    }
 
     await em.removeAndFlush(partido);
     res.status(204).end();

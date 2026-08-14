@@ -56,11 +56,9 @@ Los 20 casos de esta corrección (positivos y negativos) se probaron en vivo con
 
 **Por qué queda pendiente**: si `.env` no está configurado, el proyecto arranca igual y funciona (conveniente para una entrega académica sin fricción de setup), pero firma y verifica todos los tokens con una clave conocida y pública (está en el propio código fuente del repo). Cualquiera que lea el código podría fabricar un JWT válido para cualquier usuario sin necesitar la base ni ninguna contraseña, si el proyecto llegara a correr en algún entorno sin `JWT_SECRET` seteada de verdad.
 
-## 8. CRUD de `Partido` sin protección de rol — el hallazgo de seguridad más importante hoy
+## 8. ~~CRUD de `Partido` sin protección de rol~~ — resuelto
 
-**Dónde**: `src/partido/partido.routes.ts` — `POST /`, `PUT`/`PATCH /:id` y `DELETE /:id` no tienen `requireRole` ni ningún chequeo de ownership, a diferencia de `PATCH /:id/resultado` y `PATCH /:id/programacion` (ambos protegidos, exigen ser el admin dueño del torneo).
-
-**Por qué es grave**: cualquier usuario autenticado — incluso un `jugador` sin ningún vínculo con el partido — puede crear, editar o borrar cualquier partido de cualquier torneo. Es el único CRUD del proyecto que quedó completamente abierto (el resto de los recursos administrables usan `requireRole('admin')` de forma consistente). Corregirlo implica agregar `requireRole('admin')` a las 3 rutas y, siguiendo el patrón ya usado en `torneo.controler.ts` (`verificarAdminDueño`) o en `actualizarResultado`/`actualizarProgramacion` de este mismo archivo, verificar que quien llama sea el admin dueño del torneo del partido.
+**Actualizado (14/08)**: `POST /`, `PUT`/`PATCH /:id` y `DELETE /:id` de `src/partido/partido.routes.ts` ahora exigen `requireRole('admin')` en la ruta, más el mismo chequeo de ownership que ya usaban `actualizarResultado`/`actualizarProgramacion` (admin dueño del torneo del partido) directo en el controlador. Cubierto por `src/partido/partido.autorizacion.integration.test.ts` (rechaza jugador, rechaza admin de otro torneo, permite al dueño). Se deja el ítem tachado por el mismo motivo que los de arriba.
 
 ## 9. `participacion.controler.ts` sin ownership por torneo
 

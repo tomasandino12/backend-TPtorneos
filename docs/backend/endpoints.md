@@ -78,13 +78,13 @@ Las respuestas de éxito, salvo que se aclare lo contrario, tienen la forma `{ m
 | GET | `/programados` | cualquier autenticado | — | `200` partidos con `estado_partido: 'programado'`, ordenados por fecha, con equipos poblados | — |
 | GET | `/torneo/:id` | cualquier autenticado | — | `200` (`[]` si no hay partidos) | `400` id inválido |
 | GET | `/:id` | cualquier autenticado | — | `200` | `404` |
-| POST | `/` | cualquier autenticado | `{ fecha_partido, hora_partido, estado_partido, jornada, goles_local?, goles_visitante?, torneo, cancha, arbitro, local, visitante }` | `201` | `400` faltan campos requeridos · `400` local = visitante |
+| POST | `/` | JWT: admin dueño del torneo (`data.torneo`) | `{ fecha_partido, hora_partido, estado_partido, jornada, goles_local?, goles_visitante?, torneo, cancha, arbitro, local, visitante }` | `201` | `400` faltan campos requeridos · `400` local = visitante · `404` torneo no encontrado · `403` no es el dueño |
 | PATCH | `/:id/resultado` | JWT: admin dueño del torneo | `{ goles_local, goles_visitante, confirmarReedicion? }` | `200` marca `estado_partido: 'finalizado'` | `403` no es el dueño · `409` ya tiene resultado y falta `confirmarReedicion: true` · `400` goles no son enteros ≥ 0 |
 | PATCH | `/:id/programacion` | JWT: admin dueño del torneo | `{ fecha_partido, hora_partido }` | `200` reprograma fecha/hora | `403` no es el dueño · `400` torneo no `en_curso` · `400` partido ya `finalizado` o ya jugado · `400` nueva fecha en el pasado · `409` árbitro o cancha ya ocupados en ese horario |
-| PUT / PATCH | `/:id` | cualquier autenticado | subconjunto | `200` | `404` |
-| DELETE | `/:id` | cualquier autenticado | — | `204` | `404` |
+| PUT / PATCH | `/:id` | JWT: admin dueño del torneo del partido | subconjunto | `200` | `404` · `403` no es el dueño |
+| DELETE | `/:id` | JWT: admin dueño del torneo del partido | — | `204` | `404` · `403` no es el dueño |
 
-**Nota de seguridad — hallazgo pendiente**: a diferencia de `/:id/resultado` y `/:id/programacion` (bien protegidos, con ownership del torneo), el CRUD base (`POST /`, `PUT`/`PATCH /:id`, `DELETE /:id`) no tiene `requireRole` ni chequeo de dueño — cualquier usuario autenticado, incluso un jugador sin ningún vínculo con el partido, puede crear, editar o borrar cualquier partido de cualquier torneo. Ver `pendientes.md`.
+**Actualizado (14/08)**: el CRUD base (`POST /`, `PUT`/`PATCH /:id`, `DELETE /:id`) ya no está abierto a cualquier autenticado — ahora exige `requireRole('admin')` en la ruta más el mismo chequeo de ownership que `/:id/resultado`/`/:id/programacion`. Cubierto por `src/partido/partido.autorizacion.integration.test.ts`.
 
 ## Canchas — `/api/canchas`
 

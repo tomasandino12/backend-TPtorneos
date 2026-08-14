@@ -8,10 +8,10 @@ partidoRouter.get('/', findAll);
 partidoRouter.get('/programados', findProgramados);
 partidoRouter.get("/torneo/:id", getPartidosPorTorneo);
 partidoRouter.get('/:id', findOne);
-partidoRouter.post('/', sanitizePartidoInput, add);
+partidoRouter.post('/', requireRole('admin'), sanitizePartidoInput, add);
 partidoRouter.patch('/:id/resultado', requireRole('admin'), actualizarResultado);
 partidoRouter.patch('/:id/programacion', requireRole('admin'), actualizarProgramacion);
-partidoRouter.put('/:id', sanitizePartidoInput, update);
-partidoRouter.patch('/:id', sanitizePartidoInput, update);
-partidoRouter.delete('/:id', remove);
+partidoRouter.put('/:id', requireRole('admin'), sanitizePartidoInput, update);
+partidoRouter.patch('/:id', requireRole('admin'), sanitizePartidoInput, update);
+partidoRouter.delete('/:id', requireRole('admin'), remove);
 
