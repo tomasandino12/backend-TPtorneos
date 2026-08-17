@@ -169,11 +169,22 @@ async function add(req: Request, res: Response) {
 
     const data = { ...req.body.sanitizedInput, adminTorneo: req.user.id };
 
-    // Regla 3 NO se valida acá: un torneo recién creado tiene 0 equipos
-    // inscriptos por definición (todavía no existe ni tiene id), así que
-    // validar contra el conteo real siempre daría mínimo 0 días — no hay
-    // nada sensato que chequear hasta que empiecen a inscribirse equipos
-    // (ver participacion.controler.ts add(), que sí la valida en cada alta).
+    // Regla 3, contra el CUPO declarado (cantidadEquipos): al crear no hay
+    // participaciones reales todavía (siempre serían 0, haciendo la regla un
+    // no-op), pero cantidadEquipos sí existe desde el alta. No reemplaza la
+    // validación de participacion.controler.ts add() (esa sigue siendo la
+    // defensa en profundidad contra el conteo REAL de equipos inscriptos,
+    // necesaria por si cantidadEquipos se edita después de creado el torneo).
+    if (data.cantidadEquipos !== undefined) {
+      const errorDuracion = validarDuracionMinima(
+        new Date(data.fechaInicio),
+        new Date(data.fechaFin),
+        Number(data.cantidadEquipos)
+      );
+      if (errorDuracion) {
+        return res.status(409).json({ message: errorDuracion });
+      }
+    }
 
     const torneo = em.create(Torneo, data);
     await em.persistAndFlush(torneo);

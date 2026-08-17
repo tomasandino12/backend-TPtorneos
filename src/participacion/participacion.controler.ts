@@ -137,10 +137,20 @@ async function add(req: Request, res: Response) {
       });
     }
 
-    // Validación 4 (Regla 3): la duración fija del torneo (fechaInicio/fechaFin
+    // Validación 4: no exceder el cupo máximo de equipos del torneo. No puede
+    // depender solo del frontend (que además calcula "cupos restantes" pero
+    // no lo usaba para bloquear la selección) — sin esto, pegándole directo
+    // al endpoint se podía inscribir de más.
+    const equiposActuales = await em.count(Participacion, { torneo: torneoId });
+    if (equiposActuales >= torneo.cantidadEquipos) {
+      return res.status(409).json({
+        message: `El torneo ya alcanzó su cupo máximo de ${torneo.cantidadEquipos} equipo(s).`,
+      });
+    }
+
+    // Validación 5 (Regla 3): la duración fija del torneo (fechaInicio/fechaFin
     // no cambian acá) tiene que alcanzar para 7 días × cada equipo ya inscripto
     // MÁS este que se está por agregar (+1, porque todavía no está persistido).
-    const equiposActuales = await em.count(Participacion, { torneo: torneoId });
     const errorDuracion = validarDuracionMinima(torneo.fechaInicio, torneo.fechaFin, equiposActuales + 1);
     if (errorDuracion) {
       return res.status(400).json({ message: errorDuracion });
