@@ -12,7 +12,14 @@ import { Participacion } from './participacion.entity.js';
  * Test de integración: levanta la app Express real (con MikroORM conectado a
  * `gestordetorneos_test`) y verifica la regla de negocio "un equipo no puede
  * inscribirse en un torneo cuyas fechas se superponen con las de otro torneo
- * en el que ya participa" (participacion.controler.ts, Validación 3).
+ * en el que ya participa" (participacion.controler.ts, Validación 2).
+ *
+ * También cubre la regresión de una validación previa (ya eliminada) que
+ * bloqueaba directo por `torneo.estado === 'en_curso'` sin mirar fechas: un
+ * equipo con un torneo en_curso quedaba bloqueado de anotarse a CUALQUIER
+ * otro torneo, incluso sin superposición real (caso real reportado: "Clausura
+ * 2026" en_curso bloqueaba la inscripción a "Apertura 2027", con más de 3
+ * meses de diferencia entre el fin de uno y el inicio del otro).
  *
  * Torneo base del equipo: 01/01/2025 - 01/03/2025.
  */
@@ -22,6 +29,7 @@ describe('POST /api/participacion — superposición de fechas entre torneos', (
   let adminId: number;
   let equipoId: number;
   let torneoBaseId: number;
+  let equipoEnCursoId: number;
   const idsTorneosCreados: number[] = [];
 
   beforeAll(async () => {
@@ -54,10 +62,35 @@ describe('POST /api/participacion — superposición de fechas entre torneos', (
     em.create(Participacion, { equipo, torneo: torneoBase, fecha_inscripcion: new Date() });
     await em.flush();
 
+    // Equipo/torneo separados para el caso de regresión: un torneo en_curso
+    // (fechas ya cerradas) que NO debe bloquear inscripciones a otro torneo
+    // sin superposición real, solo por su estado.
+    const equipoEnCurso = em.create(Equipo, {
+      nombreEquipo: `Equipo EnCurso ${sufijo}`,
+      colorPrimario: '#000000',
+      categoria: 'mayores',
+    });
+    await em.persistAndFlush(equipoEnCurso);
+
+    const torneoEnCurso = em.create(Torneo, {
+      nombreTorneo: `Clausura ${sufijo}`,
+      fechaInicio: new Date('2025-01-10'),
+      fechaFin: new Date('2025-02-10'),
+      estado: 'en_curso',
+      categoria: 'mayores',
+      cantidadEquipos: 8,
+      adminTorneo: admin,
+    });
+    await em.persistAndFlush(torneoEnCurso);
+
+    em.create(Participacion, { equipo: equipoEnCurso, torneo: torneoEnCurso, fecha_inscripcion: new Date() });
+    await em.flush();
+
     adminId = admin.id!;
     equipoId = equipo.id!;
     torneoBaseId = torneoBase.id!;
-    idsTorneosCreados.push(torneoBaseId);
+    equipoEnCursoId = equipoEnCurso.id!;
+    idsTorneosCreados.push(torneoBaseId, torneoEnCurso.id!);
 
     // Se firma el JWT directo (mismo secreto que usa la app en .env.test) en
     // vez de pasar por /adminTorneo/login — evita depender del flujo de
@@ -69,15 +102,18 @@ describe('POST /api/participacion — superposición de fechas entre torneos', (
 
   afterAll(async () => {
     const em = orm.em.fork();
-    await em.nativeDelete(Participacion, { equipo: equipoId });
+    await em.nativeDelete(Participacion, { equipo: { $in: [equipoId, equipoEnCursoId] } });
     if (idsTorneosCreados.length) await em.nativeDelete(Torneo, { id: { $in: idsTorneosCreados } });
-    await em.nativeDelete(Equipo, { id: equipoId });
+    await em.nativeDelete(Equipo, { id: { $in: [equipoId, equipoEnCursoId] } });
     await em.nativeDelete(AdminTorneo, { id: adminId });
     await orm.close(true);
   });
 
   /** Crea un torneo adicional (misma categoría, mismo admin) directo por ORM
-   * — evita pasar por el endpoint de creación, que no es lo que se testea. */
+   * — evita pasar por el endpoint de creación, que no es lo que se testea.
+   * `cantidadEquipos: 8` explícito: el default de la entidad es 0, y desde
+   * que existe la validación de cupo máximo (Validación 3) un torneo con
+   * cupo 0 rechazaría cualquier inscripción antes de llegar a validar fechas. */
   async function crearTorneo(nombre: string, fechaInicio: string, fechaFin: string) {
     const em = orm.em.fork();
     const torneo = em.create(Torneo, {
@@ -86,6 +122,7 @@ describe('POST /api/participacion — superposición de fechas entre torneos', (
       fechaFin: new Date(fechaFin),
       estado: 'inscripcion',
       categoria: 'mayores',
+      cantidadEquipos: 8,
       adminTorneo: em.getReference(AdminTorneo, adminId),
     });
     await em.persistAndFlush(torneo);
@@ -115,6 +152,22 @@ describe('POST /api/participacion — superposición de fechas entre torneos', (
       .post('/api/participacion')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ equipo: equipoId, torneo: torneoLibreId, fecha_inscripcion: new Date().toISOString() });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('permite inscribirse a un torneo sin superposición de fechas aunque el equipo ya participe en otro torneo "en_curso" (regresión)', async () => {
+    // Torneo en_curso del equipo: 10/01/2025 - 10/02/2025. Este nuevo torneo
+    // arranca casi 4 meses después de que aquel terminó -> no se superponen.
+    // Antes de eliminar la Validación 2, esto se rechazaba igual, solo por
+    // el estado 'en_curso' del otro torneo, sin importar la falta de
+    // superposición real (ver comentario del describe).
+    const torneoNuevoId = await crearTorneo(`Apertura ${sufijo}`, '2025-06-01', '2025-08-01');
+
+    const res = await request(app)
+      .post('/api/participacion')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ equipo: equipoEnCursoId, torneo: torneoNuevoId, fecha_inscripcion: new Date().toISOString() });
 
     expect(res.status).toBe(201);
   });

@@ -131,7 +131,7 @@ CRUD estándar, sin reglas de negocio propias.
 |---|---|---|---|---|---|
 | GET | `/` | cualquier autenticado | — | `200` (equipo/torneo poblados) | — |
 | GET | `/:id` | cualquier autenticado | — | `200` | `404` |
-| POST | `/` | JWT: rol `admin` | `{ equipo, torneo, fecha_inscripcion }` | `201` | `404` equipo/torneo · `400` categoría no coincide · `409` equipo ya en un torneo `en_curso` |
+| POST | `/` | JWT: rol `admin` | `{ equipo, torneo, fecha_inscripcion }` | `201` | `404` equipo/torneo · `400` categoría no coincide · `409` fechas superpuestas con otro torneo del equipo (cualquier estado) · `409` cupo máximo del torneo alcanzado · `400` duración mínima no alcanzada |
 | PUT / PATCH | `/:id` | JWT: rol `admin` (sin verificar que sea el admin dueño de *ese* torneo puntual — ver nota abajo) | subconjunto | `200` | — |
 | DELETE | `/:id` | JWT: rol `admin` (mismo hueco que arriba) | — | `200` | — |
 

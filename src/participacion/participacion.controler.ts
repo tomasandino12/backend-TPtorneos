@@ -109,21 +109,14 @@ async function add(req: Request, res: Response) {
       });
     }
 
-    // Validación 2: el equipo no está en un torneo activo
-    const participacionActiva = await em.findOne(
-      Participacion,
-      { equipo: equipoId, torneo: { estado: 'en_curso' } },
-      { populate: ['torneo'] }
-    );
-    if (participacionActiva) {
-      return res.status(409).json({
-        message: `El equipo ya está participando en el torneo activo "${(participacionActiva.torneo as any).nombreTorneo}"`,
-      });
-    }
-
-    // Validación 3: el equipo no puede estar inscripto en otro torneo cuyas
+    // Validación 2: el equipo no puede estar inscripto en otro torneo cuyas
     // fechas se superpongan con las de este (sin importar el estado de ese
-    // otro torneo — a diferencia de la validación 2, que solo mira "en_curso").
+    // otro torneo — un torneo "en_curso" superpuesto en fechas cae acá igual
+    // que uno en "inscripcion"). Antes existía una validación previa que
+    // bloqueaba directo por "estado === en_curso" sin mirar fechas — se quitó
+    // por dar falsos positivos: un equipo con un torneo en_curso quedaba
+    // bloqueado de anotarse a CUALQUIER otro torneo, aunque no hubiera
+    // superposición real de fechas (ver participacion.integration.test.ts).
     const participacionesDelEquipo = await em.find(
       Participacion,
       { equipo: equipoId, torneo: { $ne: torneoId } },
@@ -137,7 +130,7 @@ async function add(req: Request, res: Response) {
       });
     }
 
-    // Validación 4: no exceder el cupo máximo de equipos del torneo. No puede
+    // Validación 3: no exceder el cupo máximo de equipos del torneo. No puede
     // depender solo del frontend (que además calcula "cupos restantes" pero
     // no lo usaba para bloquear la selección) — sin esto, pegándole directo
     // al endpoint se podía inscribir de más.
@@ -148,7 +141,7 @@ async function add(req: Request, res: Response) {
       });
     }
 
-    // Validación 5 (Regla 3): la duración fija del torneo (fechaInicio/fechaFin
+    // Validación 4 (Regla 3): la duración fija del torneo (fechaInicio/fechaFin
     // no cambian acá) tiene que alcanzar para 7 días × cada equipo ya inscripto
     // MÁS este que se está por agregar (+1, porque todavía no está persistido).
     const errorDuracion = validarDuracionMinima(torneo.fechaInicio, torneo.fechaFin, equiposActuales + 1);
