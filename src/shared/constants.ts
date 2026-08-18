@@ -17,3 +17,8 @@ export const MIN_JUGADORES_PLANTEL_TORNEO = 15;
  * para la reasignación automática cuando se saca un árbitro/cancha en uso. */
 export const MIN_ARBITROS_TORNEO = 3;
 export const MIN_CANCHAS_TORNEO = 3;
+
+/** Separación mínima, en días, entre dos jornadas consecutivas de un torneo
+ * (Regla 3: duración mínima = (cantidad de jornadas - 1) × este valor). Ver
+ * torneo.controler.ts, calcularCantidadJornadas()/validarDuracionMinima(). */
+export const DIAS_MIN_ENTRE_JORNADAS = 4;

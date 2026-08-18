@@ -3,6 +3,7 @@ import { orm } from '../shared/db/orm.js';
 import { Participacion } from './participacion.entity.js';
 import { Equipo } from '../equipo/equipo.entity.js';
 import { Torneo } from '../torneo/torneo.entity.js';
+import { validarDuracionMinima } from '../torneo/torneo.controler.js';
 
 const em = orm.em;
 
@@ -23,21 +24,6 @@ function formatFecha(fecha: Date): string {
  * día) que el fin del otro. Fórmula estándar de solapamiento de rangos. */
 function seSuperponen(a: { fechaInicio: Date; fechaFin: Date }, b: { fechaInicio: Date; fechaFin: Date }): boolean {
   return a.fechaInicio <= b.fechaFin && b.fechaInicio <= a.fechaFin;
-}
-
-/** Regla 3 (misma fórmula que torneo.controler.ts): duración mínima = 7 días
- * × cantidad REAL de equipos. `cantidadEquiposReal` tiene que ser el conteo
- * de participaciones en el momento de la validación (acá, +1 por el equipo
- * que se está por agregar y todavía no está persistido) — nunca
- * `Torneo.cantidadEquipos`, que es solo el cupo máximo declarado. */
-function validarDuracionMinima(fechaInicio: Date, fechaFin: Date, cantidadEquiposReal: number): string | null {
-  const MS_POR_DIA = 24 * 60 * 60 * 1000;
-  const dias = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / MS_POR_DIA);
-  const minimoRequerido = 7 * cantidadEquiposReal;
-  if (dias < minimoRequerido) {
-    return `La duración del torneo (${dias} día(s)) es menor a la mínima requerida: 7 días × ${cantidadEquiposReal} equipos = ${minimoRequerido} día(s).`;
-  }
-  return null;
 }
 
 // 🔹 Middleware para sanitizar input
@@ -142,9 +128,10 @@ async function add(req: Request, res: Response) {
     }
 
     // Validación 4 (Regla 3): la duración fija del torneo (fechaInicio/fechaFin
-    // no cambian acá) tiene que alcanzar para 7 días × cada equipo ya inscripto
-    // MÁS este que se está por agregar (+1, porque todavía no está persistido).
-    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, torneo.fechaFin, equiposActuales + 1);
+    // no cambian acá) tiene que alcanzar para la cantidad de jornadas que
+    // necesitan cada equipo ya inscripto MÁS este que se está por agregar
+    // (+1, porque todavía no está persistido).
+    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, torneo.fechaFin, equiposActuales + 1, torneo.formato);
     if (errorDuracion) {
       return res.status(400).json({ message: errorDuracion });
     }

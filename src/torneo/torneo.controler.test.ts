@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generarRondas, elegirReemplazoMenosCargado } from './torneo.controler.js';
+import { generarRondas, elegirReemplazoMenosCargado, calcularCantidadJornadas, validarDuracionMinima } from './torneo.controler.js';
 import type { Participacion } from '../participacion/participacion.entity.js';
 
 /** Helper: arma participaciones "de mentira" (solo con id, que es lo único
@@ -60,6 +60,62 @@ describe('generarRondas (round-robin del fixture)', () => {
       expect(primeraJornadaVuelta[i][0].id).toBe(visitante.id);
       expect(primeraJornadaVuelta[i][1].id).toBe(local.id);
     });
+  });
+});
+
+describe('calcularCantidadJornadas (reutiliza generarRondas, no reimplementa el cálculo)', () => {
+  it('2 equipos "ida" -> 1 jornada', () => {
+    expect(calcularCantidadJornadas(2, 'ida')).toBe(1);
+  });
+
+  it('4 equipos "ida" -> 3 jornadas', () => {
+    expect(calcularCantidadJornadas(4, 'ida')).toBe(3);
+  });
+
+  it('cantidad impar (3 equipos, con bye) da la misma cantidad de jornadas que la cantidad par siguiente (4)', () => {
+    expect(calcularCantidadJornadas(3, 'ida')).toBe(calcularCantidadJornadas(4, 'ida'));
+    expect(calcularCantidadJornadas(3, 'ida')).toBe(3);
+  });
+
+  it('8 equipos "ida" -> 7 jornadas', () => {
+    expect(calcularCantidadJornadas(8, 'ida')).toBe(7);
+  });
+
+  it('"idayvuelta" duplica la cantidad de jornadas de "ida"', () => {
+    expect(calcularCantidadJornadas(8, 'idayvuelta')).toBe(14);
+  });
+
+  it('menos de 2 equipos -> 0 jornadas', () => {
+    expect(calcularCantidadJornadas(0, 'ida')).toBe(0);
+  });
+});
+
+describe('validarDuracionMinima (Regla 3: (jornadas - 1) × 4 días entre jornadas)', () => {
+  it('8 equipos "ida" (7 jornadas, mínimo 24 días) con exactamente 24 días de duración: no rechaza', () => {
+    const error = validarDuracionMinima(new Date('2025-01-01'), new Date('2025-01-25'), 8, 'ida');
+    expect(error).toBeNull();
+  });
+
+  it('8 equipos "ida" con 20 días de duración (menos que el mínimo de 24): rechaza con los números reales', () => {
+    const error = validarDuracionMinima(new Date('2025-01-01'), new Date('2025-01-21'), 8, 'ida');
+    expect(error).not.toBeNull();
+    expect(error).toContain('7 jornada(s)');
+    expect(error).toContain('8 equipos');
+    expect(error).toContain('24 día(s)');
+    expect(error).toContain('20 día(s)');
+  });
+
+  it('2 equipos (1 jornada, mínimo 0 días) con duración 0: no rechaza — no hace falta separación entre jornadas', () => {
+    const error = validarDuracionMinima(new Date('2025-01-01'), new Date('2025-01-01'), 2, 'ida');
+    expect(error).toBeNull();
+  });
+
+  it('mismo cupo, pero "idayvuelta" exige el doble de días que "ida"', () => {
+    const errorIda = validarDuracionMinima(new Date('2025-01-01'), new Date('2025-01-25'), 8, 'ida');
+    const errorIdaYVuelta = validarDuracionMinima(new Date('2025-01-01'), new Date('2025-01-25'), 8, 'idayvuelta');
+    expect(errorIda).toBeNull(); // 24 días alcanzan para "ida"
+    expect(errorIdaYVuelta).not.toBeNull(); // pero no para "idayvuelta" (requiere 52)
+    expect(errorIdaYVuelta).toContain('52 día(s)');
   });
 });
 

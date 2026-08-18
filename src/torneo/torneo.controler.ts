@@ -9,7 +9,7 @@ import { Arbitro } from '../arbitro/arbitro.entity.js';
 import { Cancha } from '../cancha/cancha.entity.js';
 import { Notificacion } from '../notificacion/notificacion.entity.js';
 import { Suspension } from '../suspension/suspension.entity.js';
-import { MIN_ARBITROS_TORNEO, MIN_CANCHAS_TORNEO } from '../shared/constants.js';
+import { MIN_ARBITROS_TORNEO, MIN_CANCHAS_TORNEO, DIAS_MIN_ENTRE_JORNADAS } from '../shared/constants.js';
 import { CATEGORIAS_VALIDAS } from '../shared/categorias.js';
 
 const em = orm.em;
@@ -28,19 +28,40 @@ function verificarAdminDueño(torneo: Torneo, req: Request): { status: number; m
   return null;
 }
 
-/** Regla 3: duración mínima = 7 días × cantidad de equipos. IMPORTANTE: el
- * tercer parámetro tiene que ser el conteo REAL de equipos a validar en ese
- * momento (participaciones.length, +1 si se está por agregar uno nuevo que
- * todavía no está persistido) — nunca `Torneo.cantidadEquipos`, que es solo
- * el cupo máximo declarado y puede desincronizarse de la realidad (llegó a
- * quedar en 0 con 12 equipos ya inscriptos). Devuelve un mensaje de error si
- * no se cumple, o null si la duración es válida. */
-function validarDuracionMinima(fechaInicio: Date, fechaFin: Date, cantidadEquiposReal: number): string | null {
+/** Cantidad de jornadas que necesita un round-robin de `cantidadEquipos`
+ * equipos, para el `formato` dado ('ida' | 'idayvuelta') — reutiliza
+ * generarRondas() con participaciones "de mentira" (armadas solo con un id,
+ * que es lo único que generarRondas necesita) en vez de reimplementar la
+ * cuenta de jornadas por separado: cero riesgo de que este número se
+ * desincronice del fixture que realmente se genera. */
+function calcularCantidadJornadas(cantidadEquipos: number, formato: string): number {
+  const participacionesFake = Array.from({ length: Math.max(0, cantidadEquipos) }, (_, i) => ({ id: i + 1 })) as Participacion[];
+  return generarRondas(participacionesFake, formato).length;
+}
+
+/** Regla 3: duración mínima = (cantidad de jornadas - 1) × DIAS_MIN_ENTRE_JORNADAS
+ * días — la primera jornada ocurre en fechaInicio, y las restantes tienen que
+ * entrar en el rango con al menos ese mínimo de separación entre cada una.
+ * La cantidad de jornadas sale de calcularCantidadJornadas() (mismo cálculo
+ * round-robin que usa generarFixture, no una fórmula aparte).
+ *
+ * IMPORTANTE: el tercer parámetro tiene que ser el conteo REAL de equipos a
+ * validar en ese momento (participaciones.length, +1 si se está por agregar
+ * uno nuevo que todavía no está persistido) en la mayoría de los llamadores
+ * — salvo en la creación del torneo, donde el conteo real siempre es 0 y se
+ * usa `Torneo.cantidadEquipos` (el cupo declarado) porque es lo único que
+ * existe en ese momento (ver torneo.controler.ts add()). Devuelve un mensaje
+ * de error si no se cumple, o null si la duración es válida. */
+function validarDuracionMinima(fechaInicio: Date, fechaFin: Date, cantidadEquipos: number, formato: string): string | null {
   const MS_POR_DIA = 24 * 60 * 60 * 1000;
   const dias = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / MS_POR_DIA);
-  const minimoRequerido = 7 * cantidadEquiposReal;
+  const jornadas = calcularCantidadJornadas(cantidadEquipos, formato);
+  const minimoRequerido = Math.max(0, jornadas - 1) * DIAS_MIN_ENTRE_JORNADAS;
   if (dias < minimoRequerido) {
-    return `La duración del torneo (${dias} día(s)) es menor a la mínima requerida: 7 días × ${cantidadEquiposReal} equipos = ${minimoRequerido} día(s).`;
+    const formatoLabel = formato === 'idayvuelta' ? 'ida y vuelta' : 'solo ida';
+    return `Este torneo necesita al menos ${jornadas} jornada(s) para ${cantidadEquipos} equipos (formato ${formatoLabel}). `
+      + `Con un mínimo de ${DIAS_MIN_ENTRE_JORNADAS} días entre jornadas, la duración mínima requerida es de ${minimoRequerido} día(s). `
+      + `La duración actual es de ${dias} día(s).`;
   }
   return null;
 }
@@ -179,7 +200,8 @@ async function add(req: Request, res: Response) {
       const errorDuracion = validarDuracionMinima(
         new Date(data.fechaInicio),
         new Date(data.fechaFin),
-        Number(data.cantidadEquipos)
+        Number(data.cantidadEquipos),
+        data.formato ?? 'ida'
       );
       if (errorDuracion) {
         return res.status(409).json({ message: errorDuracion });
@@ -235,8 +257,9 @@ async function update(req: Request, res: Response) {
       const fechaInicioEfectiva = data.fechaInicio ? new Date(data.fechaInicio) : torneoToUpdate.fechaInicio;
       const fechaFinEfectiva = data.fechaFin ? new Date(data.fechaFin) : torneoToUpdate.fechaFin;
       const equiposReales = await em.count(Participacion, { torneo: id });
+      const formatoEfectivo = data.formato ?? torneoToUpdate.formato;
 
-      const errorDuracion = validarDuracionMinima(fechaInicioEfectiva, fechaFinEfectiva, equiposReales);
+      const errorDuracion = validarDuracionMinima(fechaInicioEfectiva, fechaFinEfectiva, equiposReales, formatoEfectivo);
       if (errorDuracion) return res.status(400).json({ message: errorDuracion });
     }
 
@@ -612,7 +635,7 @@ async function generarFixture(req: Request, res: Response) {
       return res.status(409).json({ message: 'El torneo ya tiene un fixture generado' });
     }
 
-    const { fechaBase, horaBase, diasEntreJornadas = 7 } = req.body;
+    const { fechaBase, horaBase } = req.body;
 
     if (!fechaBase || !horaBase) {
       return res.status(400).json({ message: 'Campos requeridos: fechaBase, horaBase' });
@@ -630,6 +653,17 @@ async function generarFixture(req: Request, res: Response) {
     }
 
     const rondas = generarRondas(participaciones, torneo.formato);
+
+    // "Días entre jornadas" ya no lo elige el admin a mano (dejaba armar
+    // fixtures con separación arbitraria, sin relación con la duración real
+    // del torneo) — se calcula acá, server-side, con los datos reales del
+    // Torneo: la duración real repartida en partes iguales entre las
+    // jornadas que van DESPUÉS de la primera (que arranca en fechaBase).
+    // Nunca confía en un valor que mande el body (mismo criterio que el
+    // resto de las reglas de negocio de este proyecto).
+    const MS_POR_DIA = 24 * 60 * 60 * 1000;
+    const duracionRealDias = Math.round((torneo.fechaFin.getTime() - torneo.fechaInicio.getTime()) / MS_POR_DIA);
+    const diasEntreJornadas = rondas.length > 1 ? Math.floor(duracionRealDias / (rondas.length - 1)) : 0;
 
     const partidos: Partido[] = [];
     let canchaIdx = 0;
@@ -656,7 +690,7 @@ async function generarFixture(req: Request, res: Response) {
         canchaIdx++;
         arbitroIdx++;
       }
-      fechaActual.setDate(fechaActual.getDate() + Number(diasEntreJornadas));
+      fechaActual.setDate(fechaActual.getDate() + diasEntreJornadas);
     }
 
     await em.persistAndFlush(partidos);
@@ -676,7 +710,7 @@ async function generarFixture(req: Request, res: Response) {
     res.status(201).json({
       message: `Fixture generado: ${partidos.length} partidos en ${rondas.length} jornadas.`
         + (conflictos.length > 0 ? ` Se removieron ${conflictos.length} equipo(s) de otros torneos por superposición de fechas.` : ''),
-      data: { totalPartidos: partidos.length, totalJornadas: rondas.length, equiposRemovidos: conflictos },
+      data: { totalPartidos: partidos.length, totalJornadas: rondas.length, diasEntreJornadas, equiposRemovidos: conflictos },
     });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
@@ -708,7 +742,7 @@ async function previewFechaFin(req: Request, res: Response) {
     }
 
     const equiposReales = await em.count(Participacion, { torneo: id });
-    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, nuevaFechaFin, equiposReales);
+    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, nuevaFechaFin, equiposReales, torneo.formato);
     if (errorDuracion) return res.status(400).json({ message: errorDuracion });
 
     const conflictos = await buscarConflictosDeSuperposicion(em, torneo, {
@@ -756,7 +790,7 @@ async function extenderFechaFin(req: Request, res: Response) {
     // ya es inválida para este mismo torneo. Se valida contra el conteo real
     // de equipos inscriptos, no contra Torneo.cantidadEquipos.
     const equiposReales = await em.count(Participacion, { torneo: id });
-    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, nuevaFechaFin, equiposReales);
+    const errorDuracion = validarDuracionMinima(torneo.fechaInicio, nuevaFechaFin, equiposReales, torneo.formato);
     if (errorDuracion) return res.status(400).json({ message: errorDuracion });
 
     const conflictos = await buscarConflictosDeSuperposicion(em, torneo, {
@@ -808,6 +842,8 @@ export {
   setCanchas,
   generarFixture,
   generarRondas,
+  calcularCantidadJornadas,
+  validarDuracionMinima,
   elegirReemplazoMenosCargado,
   previewFechaFin,
   extenderFechaFin,
