@@ -14,12 +14,31 @@ import { enviarMailRecuperacion } from '../shared/mail/mailer.js';
 import { MAX_JUGADORES_PLANTEL } from '../shared/constants.js';
 import { procesarBajaAutomaticaSiCorresponde } from '../equipo/equipo.controler.js';
 import type { Genero } from '../shared/categorias.js';
-import { CATEGORIAS, validarJugadorParaCategoria } from '../shared/categorias.js';
+import { CATEGORIAS, validarJugadorParaCategoria, calcularEdad } from '../shared/categorias.js';
 
 const GENEROS_VALIDOS: Genero[] = ['femenino', 'masculino'];
 
 const em = orm.em;
 const googleClient = new OAuth2Client();
+
+/** Valida que la fecha de nacimiento sea una fecha real, no futura, y dentro
+ * de un rango de edad razonable (5 a 100 años) — antes no se validaba nada
+ * más allá de "el campo no está vacío", así que se podía registrar un
+ * jugador con fecha futura o una edad absurda. */
+function validarFechaNacimiento(fechaNacimiento: string): string | null {
+  const fecha = new Date(fechaNacimiento);
+  if (Number.isNaN(fecha.getTime())) {
+    return 'La fecha de nacimiento no es válida.';
+  }
+  if (fecha.getTime() > Date.now()) {
+    return 'La fecha de nacimiento no puede ser una fecha futura.';
+  }
+  const edad = calcularEdad(fechaNacimiento);
+  if (edad < 5 || edad > 100) {
+    return 'La fecha de nacimiento no es válida: la edad resultante está fuera de un rango razonable.';
+  }
+  return null;
+}
 
 /** 🔹 Sanitiza y normaliza el body */
 function sanitizeJugadorInput(req: Request, res: Response, next: NextFunction) {
@@ -816,6 +835,12 @@ async function register(req: Request, res: Response) {
       return res.status(400).json({ message: `El género es obligatorio. Valores permitidos: ${GENEROS_VALIDOS.join(', ')}` });
     }
 
+    if (!datos.fechaNacimiento) {
+      return res.status(400).json({ message: 'La fecha de nacimiento es obligatoria.' });
+    }
+    const errorFecha = validarFechaNacimiento(datos.fechaNacimiento);
+    if (errorFecha) return res.status(400).json({ message: errorFecha });
+
     const existeJugador = await em.findOne(Jugador, { email: datos.email });
     if (existeJugador)
       return res.status(409).json({ message: "Ya existe un jugador con ese email" });
@@ -930,4 +955,5 @@ export {
   googleLogin,
   forgotPassword,
   resetPassword,
+  validarFechaNacimiento,
 };
