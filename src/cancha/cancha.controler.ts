@@ -8,6 +8,12 @@ const ESTADOS_VALIDOS = ['activa', 'mantenimiento', 'inactiva'];
 
 /** Sanitiza y normaliza el body */
 function sanitizeCanchaInput(req: Request, res: Response, next: NextFunction) {
+  const raw = req.body.iluminacion;
+  if (raw !== undefined && raw !== true && raw !== false && raw !== 'true' && raw !== 'false') {
+    return res.status(400).json({ message: 'iluminacion debe ser un booleano' });
+  }
+  const iluminacion = raw === undefined ? undefined : raw === true || raw === 'true';
+
   req.body.sanitizedInput = {
     nombre: req.body.nombre,
     direccion: req.body.direccion,
@@ -15,7 +21,7 @@ function sanitizeCanchaInput(req: Request, res: Response, next: NextFunction) {
     capacidad: req.body.capacidad !== undefined ? Number(req.body.capacidad) : undefined,
     estado: req.body.estado,
     precioPorHora: req.body.precioPorHora !== undefined ? Number(req.body.precioPorHora) : undefined,
-    iluminacion: req.body.iluminacion !== undefined ? Boolean(req.body.iluminacion) : undefined,
+    iluminacion,
   };
 
   // elimina keys undefined
