@@ -26,6 +26,41 @@ function seSuperponen(a: { fechaInicio: Date; fechaFin: Date }, b: { fechaInicio
   return a.fechaInicio <= b.fechaFin && b.fechaInicio <= a.fechaFin;
 }
 
+/** Carga la participación por id y valida que quien pide (`req.user`, ya
+ * autenticado como admin por requireRole('admin')) sea además el dueño del
+ * torneo al que pertenece esa participación — requireRole solo chequea el
+ * rol, no la pertenencia (autorización horizontal, issue #2). Falla cerrado:
+ * si no se puede determinar con certeza el dueño (adminTorneo sin popular)
+ * o quién pide (req.user.id ausente), se deniega — nunca se interpreta como
+ * "coinciden". Devuelve la participación ya cargada (con torneo/adminTorneo
+ * poblados) para que el caller no repita la query, o `null` si ya respondió
+ * 404/403 — el caller debe cortar (`return`) sin volver a tocar `res`. */
+async function cargarParticipacionDeAdminDueño(
+  id: number,
+  req: Request,
+  res: Response
+): Promise<Participacion | null> {
+  const participacion = await em.findOne(
+    Participacion,
+    { id },
+    { populate: ['torneo', 'torneo.adminTorneo'] }
+  );
+
+  if (!participacion) {
+    res.status(404).json({ message: 'Participación no encontrada' });
+    return null;
+  }
+
+  const adminDueñoId = participacion.torneo.adminTorneo?.id;
+  const solicitanteId = req.user?.id;
+  if (adminDueñoId === undefined || solicitanteId === undefined || adminDueñoId !== solicitanteId) {
+    res.status(403).json({ message: 'No tenés permiso para administrar participaciones de este torneo' });
+    return null;
+  }
+
+  return participacion;
+}
+
 // 🔹 Middleware para sanitizar input
 function sanitizeParticipacionInput(req: Request, res: Response, next: NextFunction) {
   req.body.sanitizedInput = {
@@ -150,7 +185,17 @@ async function update(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const participacionToUpdate = await em.findOneOrFail(Participacion, { id });
+    const participacionToUpdate = await cargarParticipacionDeAdminDueño(id, req, res);
+    if (!participacionToUpdate) return;
+
+    // sanitizeParticipacionInput no filtra `torneo`, y em.assign lo aplicaría
+    // sin más — eso movería la participación a otro torneo aun validando el
+    // dueño del torneo original.
+    const torneoNuevo = req.body.sanitizedInput.torneo;
+    if (torneoNuevo !== undefined && Number(torneoNuevo) !== participacionToUpdate.torneo.id) {
+      return res.status(400).json({ message: 'No se puede cambiar el torneo de una participación' });
+    }
+
     em.assign(participacionToUpdate, req.body.sanitizedInput);
     await em.flush();
 
@@ -166,8 +211,10 @@ async function remove(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
-    const ref = em.getReference(Participacion, id);
-    await em.removeAndFlush(ref);
+    const participacion = await cargarParticipacionDeAdminDueño(id, req, res);
+    if (!participacion) return;
+
+    await em.removeAndFlush(participacion);
     res.status(200).json({ message: 'participacion deleted' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
