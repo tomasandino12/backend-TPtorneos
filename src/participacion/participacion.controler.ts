@@ -120,8 +120,17 @@ async function add(req: Request, res: Response) {
     const equipo = await em.findOne(Equipo, { id: equipoId });
     if (!equipo) return res.status(404).json({ message: 'Equipo no encontrado' });
 
-    const torneo = await em.findOne(Torneo, { id: torneoId });
+    const torneo = await em.findOne(Torneo, { id: torneoId }, { populate: ['adminTorneo'] });
     if (!torneo) return res.status(404).json({ message: 'Torneo no encontrado' });
+
+    // Mismo hallazgo que el issue #2, pero sobre POST: sin esto, un admin
+    // podía inscribir equipos en torneos ajenos conociendo el id. Falla
+    // cerrado si no se puede determinar con certeza dueño o solicitante.
+    const adminDueñoId = torneo.adminTorneo?.id;
+    const solicitanteId = req.user?.id;
+    if (adminDueñoId === undefined || solicitanteId === undefined || adminDueñoId !== solicitanteId) {
+      return res.status(403).json({ message: 'No tenés permiso para inscribir equipos en este torneo' });
+    }
 
     // Validación 1: categoría del equipo coincide con la del torneo
     if (equipo.categoria !== torneo.categoria) {
